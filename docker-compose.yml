@@ -1,0 +1,20 @@
+services:
+  app:
+    image: node:22-alpine
+    container_name: timesheet-app
+    working_dir: /workspace
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/workspace
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
+
+  test:
+    image: node:22-alpine
+    container_name: timesheet-test
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: npm run test
