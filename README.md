@@ -1,5 +1,11 @@
 # Work Hours Tracker Web Application
 
+[![Codespaces CI & Build Validation](https://github.com/sigfriedjk/timesheet/actions/workflows/codespaces.yml/badge.svg)](https://github.com/sigfriedjk/timesheet/actions/workflows/codespaces.yml)
+[![Deploy to GitHub Pages](https://github.com/sigfriedjk/timesheet/actions/workflows/deploy.yml/badge.svg)](https://github.com/sigfriedjk/timesheet/actions/workflows/deploy.yml)
+
+🌐 **Live Application:** [https://sigfriedjk.github.io/timesheet/](https://sigfriedjk.github.io/timesheet/)  
+💻 **Open in Codespaces:** [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/sigfriedjk/timesheet)
+
 A dedicated, streamlined single-user time tracking web application designed to replace spreadsheet-based work logs with instant calculations, shift projections, and leave accrual management.
 
 Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScript), containerized with **Docker Desktop**, and architected for **Supabase** backend synchronization.
