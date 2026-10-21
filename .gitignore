@@ -30,3 +30,6 @@ Thumbs.db
 
 # Agent metadata
 .gemini/
+
+# Local browser profiles, screenshots, and verification scratch files
+work/
