@@ -20,10 +20,16 @@ beforeAll(async () => {
     insert into auth.users values ('${A}'), ('${B}');`);
   const migration = readFileSync(new URL('./migrations/202610210001_timesheet.sql', import.meta.url), 'utf8');
   await db.exec(migration);
+  // Reproduce the broad default grants observed on the live project.
+  await db.exec('grant all on public.timesheet_logs, public.timesheet_reports to anon, authenticated');
   await db.exec(migration); // Repeatability is part of the setup contract.
 }, 30000);
 afterAll(async () => { await db?.close(); });
 describe('Migration on embedded PostgreSQL (local verification)', () => {
+  it('removes inherited TRUNCATE privileges that bypass row security', async () => {
+    await expect(asUser(A, 'truncate public.timesheet_logs')).rejects.toThrow('permission denied');
+    await expect(asUser(A, 'truncate public.timesheet_reports')).rejects.toThrow('permission denied');
+  });
   it('denies anonymous tables and the import RPC', async () => {
     await db.exec('set role anon');
     try {

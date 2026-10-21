@@ -28,21 +28,25 @@ const check = (result, operation) => { if (result.error) throw new Error(`${oper
 const created = [];
 const report = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, birthdayMonth: 1, workPercent: 100, autoPto: true }, entries: [], projectedWork: {} };
 try {
-  // Check capabilities without reading existing personal rows or sending emails.
-  check(await admin.from('timesheet_logs').select('date').limit(0), 'Schema/data API check');
-  console.log('Project key authorizes Data API access; timesheet_logs exists.');
+  // The admin key is needed only for temporary Auth users. Do not assume it has
+  // table privileges, or broaden grants just to accommodate a verification tool.
   const clients = [];
+  const sessions = [];
   for (let i = 0; i < 2; i++) {
     const email = `timesheet-verification-${randomUUID()}@example.invalid`;
     const password = randomBytes(32).toString('base64url');
     const user = check(await admin.auth.admin.createUser({ email, password, email_confirm: true }), 'Auth admin createUser').user;
     assert.ok(user); created.push(user.id);
     const client = createClient(projectUrl, publicKey, options);
-    check(await client.auth.signInWithPassword({ email, password }), 'Temporary user sign-in');
+    sessions.push(check(await client.auth.signInWithPassword({ email, password }), 'Temporary user sign-in').session);
     clients.push(client);
   }
   console.log('Project key authorizes Auth admin user creation; two normal user sessions established.');
   const [a, b] = clients; const [aId, bId] = created;
+  for (const table of ['timesheet_logs', 'timesheet_reports']) {
+    check(await a.from(table).select('user_id').limit(0), `${table} schema/data API check`);
+  }
+  console.log('Both tables are available to a normal authenticated client.');
   const anonymous = createClient(projectUrl, publicKey, options);
   for (const table of ['timesheet_logs', 'timesheet_reports']) {
     const result = await anonymous.from(table).select('*').limit(1);
@@ -69,8 +73,13 @@ try {
   check(await a.from('timesheet_logs').update({ total_hours: 9 }).eq('date', '2026-10-01').select().single(), 'Own log update');
   check(await a.from('timesheet_logs').delete().eq('date', '2026-10-02').select().single(), 'Own log delete');
   console.log('Live schema, two-user RLS, anonymous denial, CRUD, report persistence, import conflict preservation, and atomic rollback verified.');
+  if (process.env.SUPABASE_BROWSER_URL) {
+    const { verifyLiveBrowser } = await import('./verify-live-browser.mjs');
+    await verifyLiveBrowser({ site: process.env.SUPABASE_BROWSER_URL, sessions, fetch });
+  }
 } finally {
   const cleanup = await Promise.allSettled(created.map(async id => check(await admin.auth.admin.deleteUser(id), 'Temporary user cleanup')));
   await dispatcher.close();
   if (cleanup.some(result => result.status === 'rejected')) throw new Error('Temporary Auth user cleanup failed. Inspect the timesheet-verification-* accounts in the project dashboard.');
+  console.log(`Cleaned up all ${created.length} temporary Auth users and their cascading timesheet rows.`);
 }

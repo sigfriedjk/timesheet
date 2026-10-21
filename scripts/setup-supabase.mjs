@@ -10,7 +10,11 @@ async function request(path, method = 'GET', body) {
     dispatcher, method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!response.ok) throw new Error(`Management API ${method} ${path} returned HTTP ${response.status}; credentials and response body omitted.`);
+  if (!response.ok) {
+    const permission = response.status === 403 && path === 'config/auth' && method === 'PATCH'
+      ? ' Auth URL updates require project_admin_write on the Management token. Configure the URLs in the dashboard or update the environment token permissions, then rerun.' : '';
+    throw new Error(`Management API ${method} ${path} returned HTTP ${response.status}.${permission} Credentials and response body omitted.`);
+  }
   return response.json();
 }
 try {
@@ -18,11 +22,14 @@ try {
   const auth = await request('config/auth');
   const migration = await readFile(new URL('../supabase/migrations/202610210001_timesheet.sql', import.meta.url), 'utf8');
   await request('database/query', 'POST', { query: migration });
+  console.log('Database migration applied, including owner RLS and restricted browser-role privileges.');
   const redirect = 'https://sigfriedjk.github.io/timesheet/**';
   const redirects = new Set((auth.uri_allow_list || '').split(',').map(value => value.trim()).filter(Boolean));
   redirects.add(redirect);
-  await request('config/auth', 'PATCH', { site_url: 'https://sigfriedjk.github.io/timesheet/', uri_allow_list: [...redirects].join(',') });
+  if (auth.site_url !== 'https://sigfriedjk.github.io/timesheet/' || !auth.uri_allow_list?.split(',').map(value => value.trim()).includes(redirect)) {
+    await request('config/auth', 'PATCH', { site_url: 'https://sigfriedjk.github.io/timesheet/', uri_allow_list: [...redirects].join(',') });
+  }
   const verified = await request('config/auth');
-  if (verified.site_url !== 'https://sigfriedjk.github.io/timesheet/' || !verified.uri_allow_list.split(',').includes(redirect)) throw new Error('Auth URL verification failed.');
+  if (verified.site_url !== 'https://sigfriedjk.github.io/timesheet/' || !verified.uri_allow_list?.split(',').map(value => value.trim()).includes(redirect)) throw new Error('Auth URL verification failed.');
   console.log('Migration applied; Auth Site URL and redirect allowlist verified. Existing redirect entries preserved. Run npm run verify:supabase next.');
 } finally { await dispatcher.close(); }

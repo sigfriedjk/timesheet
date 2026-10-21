@@ -8,9 +8,28 @@
 - Production/base commit: `17d7bb8303df2d04528b512f6d6d14bf3c2bbd56`.
 - Initial draft checkpoint: `3c79366f5b9f0b1a2baef1f472f01a2070274208`.
 
-**No Supabase schema changes, Auth configuration changes, or production deployment have been made.** The implementation now builds and passes local integration tests, but live setup/verification remains blocked. The user requested this handoff so they can change the network policy and open a new conversation in the new environment. Deployment is already authorized once the integration is verified and ready; do not deploy an unverified backend integration.
+**The Supabase migration is now applied and live backend verification passes. Auth URL configuration and production deployment remain blocked.** Deployment is already authorized once the integration is verified and ready; do not deploy an unverified backend integration.
 
-## Latest resume findings — October 21, 2026
+## Current resume — October 21, 2026
+
+- Checked out `wip/supabase-integration-20261021` from GitHub. Production `main` is still `17d7bb8`.
+- The current environment reports all Supabase variables ready, including `SUPABASE_ACCESS_TOKEN`, and enforces access to `api.supabase.com`, `*.supabase.co`, and production. Commands need `sandbox_permissions: with_additional_permissions` and `additional_permissions.network.enabled: true`. No credential values were printed.
+- `npm run setup:supabase` successfully applied the migration through the supported Management database/query endpoint, then failed at Auth PATCH with HTTP 403: `Missing required permission(s): project_admin_write`. Auth GET succeeds; its Site URL is still `http://localhost:3000` and redirect allowlist is empty. The user has been asked to update token permissions or set the production Site URL/redirect in the dashboard. Do not work around the missing permission through database internals.
+- Live privilege inspection found default `TRUNCATE`/other surplus grants on `authenticated`; `TRUNCATE` bypasses RLS. The migration now resets browser-role grants before granting CRUD, was reapplied live, and PostgreSQL confirms `TRUNCATE` is denied on both tables. A regression test covers broad preexisting grants and repeatability.
+- The server key can administer Auth but lacks table SELECT in this project. The verifier now checks tables with a disposable authenticated client rather than broadening server-role grants. `npm run verify:supabase` passes against the real backend: two-user RLS, anonymous denial, CRUD, reports, imports, conflict preservation, rollback, and spoofed ownership. All temporary users from completed runs were deleted in `finally`.
+- `npm ci --cache /workspace/.npm-cache`, **74 unit/PostgreSQL tests**, **8 mocked browser tests**, production build, and the production smoke script against `http://127.0.0.1:4173/` pass. Built artifacts were compared in memory with configured privileged credentials; no values or secret-key literals were found.
+- Added optional real-backend Chromium verification: `SUPABASE_BROWSER_URL=http://127.0.0.1:4173/ npm run verify:supabase` after starting preview. It uses the ordinary sessions of the same two disposable accounts. Real Supabase requests are forwarded through undici using the runtime proxy and configured CA; TLS verification remains enabled, no trust-store changes occur, and no backend responses are mocked. No email is sent, and no browser trace/session artifacts are exported. This checks callback handling, but cannot establish email delivery or the currently incorrect production redirect allowlist.
+- The complete real-backend Chromium run **passes**, including Auth callback/recovery, expired-session refresh, calculator save, persisted reload/edit/delete, leave settings, explicit import preserving browser originals/cloud conflicts, sign-out, and second-account isolation. Cleanup succeeded for both disposable users; an independent SQL count confirmed zero remaining `timesheet-verification-*@example.invalid` accounts.
+- GitHub connector access is available for repository/PR/Actions operations. Shell `gh api` is blocked by the hostname policy because `api.github.com` is absent; use the connector rather than bypassing policy.
+
+### Remaining release gate
+
+1. Set Auth Site URL to `https://sigfriedjk.github.io/timesheet/`, add `https://sigfriedjk.github.io/timesheet/**` to redirects, and preserve unrelated redirect entries. The Management token needs `project_admin_write`, or the user can do this in the dashboard. Read configuration back to confirm.
+2. The complete real-backend Chromium run has passed; independent SQL inspection confirmed zero remaining verification accounts.
+3. Once ready, publish/merge to `main`, watch `.github/workflows/deploy.yml`, and verify production HTML/assets plus GitHub Actions' browser smoke report. Deployment is authorized; the WIP branch does not deploy.
+4. The user must request/open their own sign-in email to confirm email delivery. Do not send sign-in emails on their behalf.
+
+## Earlier resume findings — October 21, 2026 (superseded by current resume above)
 
 - Checked out this branch in `/workspace/timesheet`; current production `main` remains `17d7bb8`.
 - The new environment now exposes `SUPABASE_SECRET_KEY` and `SUPABASE_API_KEY`, and its network policy permits `*.supabase.co` and production. Actual requests through the configured proxy reach the project and production. Shell network commands still need the additional network permission described below. No credential values were printed.
@@ -59,11 +78,11 @@ Read the cloud-environment-runtime skill and current network policy before netwo
 
 ## Database and server-only tooling
 
-`supabase/migrations/202610210001_timesheet.sql` remains **unapplied to the real project**. It creates `timesheet_logs`, `timesheet_reports`, owner RLS policies, timestamp triggers, and atomic `import_browser_timesheet`. It is repeatable and transactional. POP definitions remain static shared configuration.
+`supabase/migrations/202610210001_timesheet.sql` is now **applied to the real project**. It creates `timesheet_logs`, `timesheet_reports`, owner RLS policies, timestamp triggers, and atomic `import_browser_timesheet`. It is repeatable and transactional. POP definitions remain static shared configuration.
 
-- `npm run setup:supabase`: server-only `scripts/setup-supabase.mjs`. Requires `SUPABASE_ACCESS_TOKEN`; reads Management API Auth config, runs the migration through the supported database/query endpoint, sets Site URL to `https://sigfriedjk.github.io/timesheet/`, merges `https://sigfriedjk.github.io/timesheet/**` into existing redirects, and reads config back. Does not use `SUPABASE_SECRET_KEY` as a SQL credential. Syntax checked only; not run against live Supabase.
+- `npm run setup:supabase`: server-only `scripts/setup-supabase.mjs`. Requires `SUPABASE_ACCESS_TOKEN`; reads Management API Auth config, runs the migration through the supported database/query endpoint, sets Site URL to `https://sigfriedjk.github.io/timesheet/`, merges `https://sigfriedjk.github.io/timesheet/**` into existing redirects, and reads config back. Does not use `SUPABASE_SECRET_KEY` as a SQL credential. Live migration succeeded; Auth PATCH failed because the token lacks `project_admin_write`.
 - `npm run verify:supabase`: server-only `scripts/verify-supabase.mjs`. Requires the project secret/service-role binding, uses the configured proxy via undici, checks the Data API, creates two temporary confirmed Auth users (`timesheet-verification-*@example.invalid`) **without sending email**, and signs them in with normal public-key clients to test RLS/CRUD/import. Tests anonymous denial, cross-user read/write/delete denial, report preservation, import conflicts/rollback, and ignores spoofed import user IDs. Cleans up temporary users in finally. Failed cleanup explicitly requires dashboard inspection. It never reads existing personal rows for the initial capability check (`limit(0)`).
-- The live script was attempted here and stopped immediately because both Supabase credential variables were absent. No remote calls or changes occurred. Do not treat a script's presence or syntax check as successful live verification.
+- The live script now passes with real disposable Auth users, including optional Chromium checks. All accounts were cleaned up. Earlier attempts in previous environments failed before setup; the current results supersede those observations.
 - The browser Settings panel also provides SQL copy/download and manual Auth URL instructions. Do not send sign-in emails on the user's behalf. The user can request a magic link through the UI for a final email/redirect check.
 
 ## Verification completed locally

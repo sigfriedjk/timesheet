@@ -27,7 +27,9 @@ create table if not exists public.timesheet_reports (
 
 alter table public.timesheet_logs enable row level security;
 alter table public.timesheet_reports enable row level security;
-revoke all on public.timesheet_logs, public.timesheet_reports from anon;
+-- Supabase projects may grant ALL by default, including TRUNCATE (which bypasses RLS).
+-- Reset browser-role privileges before granting only the operations used by the app.
+revoke all on public.timesheet_logs, public.timesheet_reports from anon, authenticated;
 grant select, insert, update, delete on public.timesheet_logs, public.timesheet_reports to authenticated;
 
 drop policy if exists timesheet_logs_owner on public.timesheet_logs;
