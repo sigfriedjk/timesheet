@@ -8,6 +8,7 @@ import {
   calculateWorkedHours,
   calculateTargetTimeOut,
   formatDurationMinutes,
+  getShiftScenarios,
 } from './calculations';
 
 describe('Calculations & Precision Rules (Section 6)', () => {
@@ -99,5 +100,44 @@ describe('Calculations & Precision Rules (Section 6)', () => {
       expect(formatDurationMinutes(45)).toBe('45m');
       expect(formatDurationMinutes(0)).toBe('0m');
     });
+  });
+});
+
+describe('Departure scenarios', () => {
+  it('pairs out time and hours independently for now, target hours, and a chosen out time', () => {
+    const scenarios = getShiftScenarios('08:00', '12:00', 30, '8', '17:00');
+    expect(scenarios.live).toEqual({ timeOut: '12:00', hours: 3.5 });
+    expect(scenarios.shift).toEqual({ timeOut: '16:30', hours: 8 });
+    expect(scenarios.out).toEqual({ timeOut: '17:00', hours: 8.5 });
+
+    const changedOut = getShiftScenarios('08:00', '12:00', 30, '8', '14:00');
+    expect(changedOut.live).toEqual(scenarios.live);
+    expect(changedOut.shift).toEqual(scenarios.shift);
+    expect(changedOut.out).toEqual({ timeOut: '14:00', hours: 5.5 });
+  });
+
+  it('applies the same break duration to all three scenarios', () => {
+    const scenarios = getShiftScenarios('08:00', '12:00', 60, '8', '17:00');
+    expect(scenarios.live?.hours).toBe(3);
+    expect(scenarios.shift?.timeOut).toBe('17:00');
+    expect(scenarios.out?.hours).toBe(8);
+  });
+
+  it('supports overnight scenarios and tenths of an hour', () => {
+    const scenarios = getShiftScenarios('22:00', '01:00', 30, '8.5', '06:30');
+    expect(scenarios.live).toEqual({ timeOut: '01:00', hours: 2.5 });
+    expect(scenarios.shift).toEqual({ timeOut: '07:00', hours: 8.5 });
+    expect(scenarios.out).toEqual({ timeOut: '06:30', hours: 8 });
+  });
+
+  it('leaves incomplete scenarios empty without changing the live calculation', () => {
+    for (const target of ['', '0', '-1', '25', 'invalid']) {
+      const scenarios = getShiftScenarios('08:00', '12:00', 30, target, '');
+      expect(scenarios.live?.hours).toBe(3.5);
+      expect(scenarios.shift).toBeNull();
+      expect(scenarios.out).toBeNull();
+    }
+    expect(getShiftScenarios('', '12:00', 30, '8', '17:00'))
+      .toEqual({ live: null, shift: null, out: null });
   });
 });

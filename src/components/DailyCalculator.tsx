@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   calculateWorkedHours,
-  calculateTargetTimeOut,
-  timeStringToMinutes,
+  getShiftScenarios,
   formatTime12Hour,
   getTodayDateString,
   getCurrentTimeString,
-  formatDurationMinutes,
 } from '../utils/calculations';
 import { TimeLog } from '../types';
 import {
@@ -14,13 +12,12 @@ import {
   Coffee,
   CheckCircle2,
   AlertTriangle,
-  Sparkles,
   Calendar as CalendarIcon,
   FileText,
 } from 'lucide-react';
 
 interface DailyCalculatorProps {
-  onLogSaved: (log: TimeLog, isOverwrite: boolean, transitionToCalendar: boolean) => void;
+  onLogSaved: (log: TimeLog) => void;
   existingLogs: TimeLog[];
 }
 
@@ -35,8 +32,6 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
   const [breakMinutes, setBreakMinutes] = useState<number>(30);
   const [targetHoursInput, setTargetHoursInput] = useState<string>('8.5');
   const [notes, setNotes] = useState<string>('');
-  const [autoTransition, setAutoTransition] = useState<boolean>(true);
-  const [showProgress, setShowProgress] = useState<boolean>(false);
   const [currentTimeStr, setCurrentTimeStr] = useState<string>(getCurrentTimeString());
 
   // Update current time clock every 10 seconds for real-time calculations
@@ -54,33 +49,16 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
 
   // Effective end time: entered timeOut or current clock time
   const effectiveTimeOut = timeOut.trim() !== '' ? timeOut : currentTimeStr;
-  const isUsingCurrentTime = timeOut.trim() === '';
 
   // Worked hours calculation
   const workedCalc = useMemo(() => {
     return calculateWorkedHours(timeIn, effectiveTimeOut, breakMinutes);
   }, [timeIn, effectiveTimeOut, breakMinutes]);
 
-  // Project departure time and progress for the entered target hours.
-  const target = useMemo(() => {
-    const hours = Number(targetHoursInput);
-    if (!Number.isFinite(hours) || hours < 0.1 || hours > 24) return null;
-
-    const calc = calculateTargetTimeOut(timeIn, hours, breakMinutes);
-    if (!calc) return null;
-
-    const inMinutes = timeStringToMinutes(timeIn)!;
-    let endMinutes = timeStringToMinutes(effectiveTimeOut) ?? 0;
-    if (endMinutes < inMinutes) endMinutes += 1440;
-
-    return {
-      hours,
-      targetTime12: calc.timeOut12,
-      remainingMinutes: Math.max(0, calc.totalTargetMinutesFromMidnight - endMinutes),
-      isReached: workedCalc.rawHours >= hours,
-      progressPercent: Math.round(Math.min(100, Math.max(0, (workedCalc.rawHours / hours) * 100))),
-    };
-  }, [timeIn, breakMinutes, targetHoursInput, effectiveTimeOut, workedCalc.rawHours]);
+  const scenarios = useMemo(
+    () => getShiftScenarios(timeIn, currentTimeStr, breakMinutes, targetHoursInput, timeOut),
+    [timeIn, currentTimeStr, breakMinutes, targetHoursInput, timeOut]
+  );
 
   const handleSetTimeInNow = () => {
     setTimeIn(getCurrentTimeString());
@@ -104,9 +82,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
         notes: notes.trim() || undefined,
         createdAt: existingEntry?.createdAt || '',
         updatedAt: '',
-      },
-      Boolean(existingEntry),
-      autoTransition
+      }
     );
     return result;
   };
@@ -184,52 +160,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                 >
                   Now
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setTimeIn('08:00')}
-                  className="btn-chip"
-                  title="Preset 08:00 AM"
-                >
-                  8:00 AM
-                </button>
-              </div>
-            </div>
 
-            {/* Time Out (Optional) */}
-            <div className="form-group">
-              <div className="label-row">
-                <label htmlFor="time-out" className="form-label">
-                  <Clock size={16} />
-                  <span>Time Out (Optional)</span>
-                </label>
-              </div>
-              <div className="input-with-actions">
-                <input
-                  id="time-out"
-                  type="time"
-                  value={timeOut}
-                  onChange={(e) => setTimeOut(e.target.value)}
-                  className={`form-input ${isUsingCurrentTime ? 'input-dimmed' : ''}`}
-                  placeholder="--:--"
-                />
-                <button
-                  type="button"
-                  onClick={handleSetTimeOutNow}
-                  className="btn-chip"
-                  title="Set Time Out to now"
-                >
-                  Now
-                </button>
-                {timeOut && (
-                  <button
-                    type="button"
-                    onClick={handleClearTimeOut}
-                    className="btn-chip chip-clear"
-                    title="Clear and resume real-time tracking"
-                  >
-                    Clear
-                  </button>
-                )}
               </div>
             </div>
 
@@ -305,120 +236,85 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                 <span className="btn-highlight">({workedCalc.roundedHours.toFixed(1)} hrs)</span>
               </button>
 
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={autoTransition}
-                  onChange={(e) => setAutoTransition(e.target.checked)}
-                />
-                <span>Auto-transition to Calendar History view upon save</span>
-              </label>
+
             </div>
           </form>
         </section>
 
-        {/* Right Column: Live Target Cards & Real-Time Projections */}
-        <section className="projections-section" aria-labelledby="projections-heading">
-          {/* Live Status Card: "If you leave now..." */}
-          <div className="calculator-card status-card">
-            <div className="status-header">
-              <span className="status-label">Live Calculation Status</span>
-            </div>
-
-            <div className="status-main">
-              <div className="status-hours">
-                <span className="big-number">{workedCalc.roundedHours.toFixed(1)}</span>
-                <span className="hours-unit">hours</span>
-              </div>
-              <div className="status-subtext">
-                {isUsingCurrentTime ? (
-                  <p className="leave-now-text">
-                    <Sparkles size={16} className="inline-icon" />
-                    <strong>If you leave now:</strong> you will log{' '}
-                    <span className="highlight-val">{workedCalc.roundedHours.toFixed(1)} hrs</span>
-                  </p>
-                ) : (
-                  <p className="fixed-shift-text">
-                    Fixed calculation from <strong>{formatTime12Hour(timeIn)}</strong> to{' '}
-                    <strong>{formatTime12Hour(timeOut)}</strong> (minus {breakMinutes}m break)
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Editable shift target */}
-          <div className="targets-container">
-            <h3 id="projections-heading" className="card-title">
-              Shift Target
-            </h3>
-            <div className={`target-card ${target?.isReached ? 'target-reached' : ''}`}>
-              <div className="target-card-top">
-                <div className="custom-target-control">
-                  <label htmlFor="target-hours-input">Target hours:</label>
-                  <input
-                    id="target-hours-input"
-                    type="number"
-                    step="0.1"
-                    min="0.1"
-                    max="24"
-                    value={targetHoursInput}
-                    onChange={(e) => setTargetHoursInput(e.target.value)}
-                    className="target-num-input"
-                    aria-describedby={!target ? 'target-hours-hint' : undefined}
-                    aria-invalid={targetHoursInput !== '' && !target}
-                  />
-                  <span>hrs</span>
-                </div>
-                {target && (
-                  target.isReached ? (
-                    <span className="badge badge-success">Target Reached</span>
-                  ) : (
-                    <span className="badge badge-pending">
-                      {formatDurationMinutes(target.remainingMinutes)} remaining
-                    </span>
-                  )
-                )}
-              </div>
-
-              {target ? (
-                <>
-                  <div className="target-time-display">
-                    <span className="target-time-label">Target Time Out:</span>
-                    <span className="target-time-val">{target.targetTime12}</span>
-                  </div>
-                  {showProgress && (
-                    <>
-                      <div className="progress-bar-container" aria-hidden="true">
-                        <div
-                          className="progress-bar-fill"
-                          style={{ width: `${target.progressPercent}%` }}
-                        />
-                      </div>
-                      <div className="progress-meta">
-                        <span>{target.progressPercent}% completed</span>
-                        <span>Goal: {target.hours.toFixed(1)} hrs</span>
-                      </div>
-                    </>
-                  )}
-                </>
-              ) : (
-                <p id="target-hours-hint" className="card-subtitle">
-                  Enter target hours from 0.1 to 24 and a valid time in to see your departure time.
-                </p>
-              )}
-            </div>
-          </div>
+        <section className="scenario-list" aria-label="Departure scenarios">
+          <ScenarioCard
+            title="Live Calculation"
+            outTime={<span className="scenario-value">{formatTime12Hour(currentTimeStr)}</span>}
+            hours={<span className="scenario-value">{scenarios.live?.hours.toFixed(1) ?? '—'}</span>}
+          />
+          <ScenarioCard
+            title="Shift Target"
+            outTime={<span className="scenario-value">{scenarios.shift ? formatTime12Hour(scenarios.shift.timeOut) : '—'}</span>}
+            hours={
+              <input
+                id="target-hours-input"
+                type="number"
+                step="0.1"
+                min="0.1"
+                max="24"
+                value={targetHoursInput}
+                onChange={(e) => setTargetHoursInput(e.target.value)}
+                className="scenario-input"
+                aria-label="Target hours"
+                aria-invalid={targetHoursInput !== '' && !scenarios.shift}
+                aria-describedby={!scenarios.shift ? 'target-hours-hint' : undefined}
+              />
+            }
+            hint={!scenarios.shift ? <p id="target-hours-hint" className="scenario-hint">Enter 0.1 to 24 hours and a valid time in.</p> : undefined}
+          />
+          <ScenarioCard
+            title="Out Target"
+            outTime={
+              <input
+                id="time-out"
+                type="time"
+                value={timeOut}
+                onChange={(e) => setTimeOut(e.target.value)}
+                className="scenario-input"
+                aria-label="Target out time"
+              />
+            }
+            hours={<span className="scenario-value">{scenarios.out?.hours.toFixed(1) ?? '—'}</span>}
+            actions={
+              <>
+                <button type="button" onClick={handleSetTimeOutNow} className="btn-chip">Now</button>
+                {timeOut && <button type="button" onClick={handleClearTimeOut} className="btn-chip chip-clear">Clear</button>}
+              </>
+            }
+          />
         </section>
       </div>
-      <label className="checkbox-label">
-        <input
-          type="checkbox"
-          checked={showProgress}
-          onChange={(e) => setShowProgress(e.target.checked)}
-        />
-        <span>Show progress bars</span>
-      </label>
     </div>
   );
 };
+
+interface ScenarioCardProps {
+  title: string;
+  outTime: React.ReactNode;
+  hours: React.ReactNode;
+  actions?: React.ReactNode;
+  hint?: React.ReactNode;
+}
+
+const ScenarioCard: React.FC<ScenarioCardProps> = ({ title, outTime, hours, actions, hint }) => (
+  <section className="calculator-card scenario-card" aria-label={title}>
+    <h3 className="card-title">{title}</h3>
+    <dl className="scenario-pair">
+      <div className="scenario-field">
+        <dt>Out time</dt>
+        <dd>{outTime}</dd>
+      </div>
+      <div className="scenario-field">
+        <dt>Hours</dt>
+        <dd>{hours}</dd>
+      </div>
+    </dl>
+    {actions && <div className="scenario-actions">{actions}</div>}
+    {hint}
+  </section>
+);

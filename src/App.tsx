@@ -30,11 +30,7 @@ export const App: React.FC = () => {
     }, 4500);
   };
 
-  const handleLogSaved = (
-    logData: TimeLog,
-    _isOverwrite: boolean,
-    transitionToCalendar: boolean
-  ) => {
+  const handleLogSaved = (logData: TimeLog) => {
     const { log, isOverwrite } = saveTimeLog(
       logData.date,
       logData.totalHours,
@@ -48,9 +44,7 @@ export const App: React.FC = () => {
 
     showToast(message, 'success');
 
-    if (transitionToCalendar) {
-      setCurrentTab('calendar');
-    }
+    setCurrentTab('calendar');
   };
 
   const handleDeleteLog = (date: string) => {

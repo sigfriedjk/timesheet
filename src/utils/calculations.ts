@@ -157,3 +157,28 @@ export function formatDurationMinutes(minutes: number): string {
   if (hrs > 0) return `${hrs}h`;
   return `${mins}m`;
 }
+
+/** Computes the out-time/hours pair for each departure scenario independently. */
+export function getShiftScenarios(
+  timeIn: string,
+  currentTime: string,
+  breakMinutes: number,
+  targetHoursInput: string,
+  targetOut: string
+) {
+  const validStart = timeStringToMinutes(timeIn) !== null;
+  const hoursAt = (timeOut: string) =>
+    validStart && timeStringToMinutes(timeOut) !== null
+      ? { timeOut, hours: calculateWorkedHours(timeIn, timeOut, breakMinutes).roundedHours }
+      : null;
+  const hours = Number(targetHoursInput);
+  const shift = Number.isFinite(hours) && hours >= 0.1 && hours <= 24
+    ? calculateTargetTimeOut(timeIn, hours, breakMinutes)
+    : null;
+
+  return {
+    live: hoursAt(currentTime),
+    shift: shift ? { timeOut: shift.timeOut24, hours } : null,
+    out: hoursAt(targetOut),
+  };
+}
