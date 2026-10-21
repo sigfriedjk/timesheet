@@ -866,3 +866,12 @@ body {
   color: var(--primary);
   font-family: var(--font-mono);
 }
+
+.btn-chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.form-input[aria-invalid="true"] {
+  border-color: var(--warning);
+}

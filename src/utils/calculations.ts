@@ -24,7 +24,7 @@ export function roundToHundredth(value: number): number {
  * Parses a "HH:MM" string into minutes from midnight (0 - 1439).
  */
 export function timeStringToMinutes(timeStr: string): number | null {
-  if (!timeStr || !timeStr.includes(':')) return null;
+  if (!/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(timeStr)) return null;
   const parts = timeStr.trim().split(':');
   if (parts.length < 2) return null;
   const hours = parseInt(parts[0], 10);
@@ -45,28 +45,6 @@ export function minutesToTimeString(minutesFromMidnight: number): string {
   const hh = hours.toString().padStart(2, '0');
   const mm = minutes.toString().padStart(2, '0');
   return `${hh}:${mm}`;
-}
-
-/**
- * Formats a 24-hour "HH:MM" string or minutes into a user-friendly 12-hour string (e.g. "4:30 PM").
- */
-export function formatTime12Hour(timeStrOrMinutes: string | number): string {
-  const totalMinutes =
-    typeof timeStrOrMinutes === 'number'
-      ? timeStrOrMinutes
-      : timeStringToMinutes(timeStrOrMinutes);
-
-  if (totalMinutes === null || isNaN(totalMinutes)) return '--:--';
-
-  const normalized = ((totalMinutes % 1440) + 1440) % 1440;
-  let hours = Math.floor(normalized / 60);
-  const minutes = normalized % 60;
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12;
-  if (hours === 0) hours = 12;
-
-  const mm = minutes.toString().padStart(2, '0');
-  return `${hours}:${mm} ${ampm}`;
 }
 
 /**
@@ -107,7 +85,7 @@ export function calculateTargetTimeOut(
   timeIn: string,
   targetHours: number,
   breakMinutes: number = 0
-): { timeOut24: string; timeOut12: string; totalTargetMinutesFromMidnight: number } | null {
+): { timeOut24: string; totalTargetMinutesFromMidnight: number } | null {
   const inMin = timeStringToMinutes(timeIn);
   if (inMin === null || isNaN(targetHours) || targetHours <= 0) {
     return null;
@@ -118,11 +96,9 @@ export function calculateTargetTimeOut(
   const targetMinutesFromMidnight = inMin + totalShiftMinutes;
 
   const timeOut24 = minutesToTimeString(targetMinutesFromMidnight);
-  const timeOut12 = formatTime12Hour(targetMinutesFromMidnight);
 
   return {
     timeOut24,
-    timeOut12,
     totalTargetMinutesFromMidnight: targetMinutesFromMidnight,
   };
 }

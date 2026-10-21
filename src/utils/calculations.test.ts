@@ -4,7 +4,6 @@ import {
   roundToHundredth,
   timeStringToMinutes,
   minutesToTimeString,
-  formatTime12Hour,
   calculateWorkedHours,
   calculateTargetTimeOut,
   formatDurationMinutes,
@@ -38,12 +37,12 @@ describe('Calculations & Precision Rules (Section 6)', () => {
       expect(timeStringToMinutes('invalid')).toBeNull();
     });
 
-    it('converts minutes back to 24h and 12h formats', () => {
+    it('formats times as zero-padded 24-hour HH:MM', () => {
       expect(minutesToTimeString(480)).toBe('08:00');
-      expect(formatTime12Hour('08:00')).toBe('8:00 AM');
-      expect(formatTime12Hour('12:00')).toBe('12:00 PM');
-      expect(formatTime12Hour('16:30')).toBe('4:30 PM');
-      expect(formatTime12Hour('00:15')).toBe('12:15 AM');
+      expect(minutesToTimeString(720)).toBe('12:00');
+      expect(minutesToTimeString(990)).toBe('16:30');
+      expect(minutesToTimeString(15)).toBe('00:15');
+      expect(minutesToTimeString(1440)).toBe('00:00');
     });
   });
 
@@ -79,19 +78,17 @@ describe('Calculations & Precision Rules (Section 6)', () => {
 
   describe('Target Time Out Calculation', () => {
     it('calculates target time out for 8.0 hours goal', () => {
-      // 08:00 + 8.0h + 30m break = 16:30 (4:30 PM)
+      // 08:00 + 8.0h + 30m break = 16:30
       const target = calculateTargetTimeOut('08:00', 8.0, 30);
       expect(target).not.toBeNull();
       expect(target?.timeOut24).toBe('16:30');
-      expect(target?.timeOut12).toBe('4:30 PM');
     });
 
     it('calculates target time out for 9.6 hours goal', () => {
-      // 08:00 + 9.6h (576 mins) + 30m break = 606 mins -> 18:06 (6:06 PM)
+      // 08:00 + 9.6h (576 mins) + 30m break = 18:06
       const target = calculateTargetTimeOut('08:00', 9.6, 30);
       expect(target).not.toBeNull();
       expect(target?.timeOut24).toBe('18:06');
-      expect(target?.timeOut12).toBe('6:06 PM');
     });
 
     it('formats duration strings', () => {
@@ -139,5 +136,23 @@ describe('Departure scenarios', () => {
     }
     expect(getShiftScenarios('', '12:00', 30, '8', '17:00'))
       .toEqual({ live: null, shift: null, out: null });
+  });
+});
+
+describe('24-hour entries and tenth-hour breaks', () => {
+  it('rejects incomplete, out-of-range, or 12-hour time entries', () => {
+    for (const value of ['1', '12:', '8:00', '08:60', '24:00', '16:30 PM', '08:00junk', '08:30:00']) {
+      expect(timeStringToMinutes(value)).toBeNull();
+    }
+    expect(timeStringToMinutes('00:00')).toBe(0);
+    expect(timeStringToMinutes('23:59')).toBe(1439);
+  });
+
+  it('uses a 36-minute break consistently for saved hours and reference scenarios', () => {
+    expect(calculateWorkedHours('08:00', '17:00', 36).roundedHours).toBe(8.4);
+    const scenarios = getShiftScenarios('08:00', '12:00', 36, '8', '16:00');
+    expect(scenarios.live?.hours).toBe(3.4);
+    expect(scenarios.shift?.timeOut).toBe('16:36');
+    expect(scenarios.out?.hours).toBe(7.4);
   });
 });

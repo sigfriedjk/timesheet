@@ -174,7 +174,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       </td>
                       <td>
                         <span className="timestamp-cell">
-                          {log.updatedAt ? new Date(log.updatedAt).toLocaleTimeString() : '—'}
+                          {log.updatedAt ? new Date(log.updatedAt).toLocaleTimeString('en-GB', { hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
                         </span>
                       </td>
                       <td>
