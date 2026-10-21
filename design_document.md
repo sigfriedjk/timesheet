@@ -17,17 +17,17 @@ The objective of this application is to replace an existing Google Sheets time-t
 * **Technology Stack (Node.js & Zero-Install Docker Environment):**
   * **Runtime & Toolchain:** Modern **Node.js** (v22 LTS) toolchain with **TypeScript**, **React**, and **Vite**.
   * **Containerized Development (Docker Desktop):** All development workflows (dev server, test suites, static build scripts) are fully containerized using **Docker Desktop** (via `docker-compose` or Docker runner). The host machine requires zero local runtime installations (no local Node.js, Python, or Git required on the host).
-  * **Target Deployment:** Static web application deployed to GitHub Pages with optional Supabase cloud synchronization.
+  * **Target Deployment:** Static web application deployed to GitHub Pages with Supabase as the default personal-data store and a separate offline sample workspace.
 
 * **Precision & Rounding Rule (CRITICAL):** 
   * All work hours entered, calculated, and displayed are rounded and maintained to the **nearest tenth of an hour** ($0.1$).
   * All leave accruals and running leave balances are calculated and maintained to the **nearest hundredth of an hour** ($0.01$).
 
-* **Single-User Architecture:** Local-first storage (e.g., IndexedDB / SQLite / LocalStorage) with optional Supabase sync, with no multi-tenant or authentication overhead required for core operation.
+* **Single-User Architecture:** Personal logs and report state require Supabase Auth and owner-scoped PostgreSQL RLS. Sample data stays entirely in browser storage, needs no sign-in, and creates no Supabase client. Existing personal browser data remains available for explicit atomic import; cloud failures do not fall back to local storage.
 
 * **Customizable Periods of Performance (POP):** Flexible creation and management of named POP ranges with custom start and end dates.
 
-* **Streamlined Daily Logging:** The daily calculator operates in-memory; saving a daily entry updates or overwrites the single historical log entry for that date and transitions the user to the 12-Month Calendar view.
+* **Streamlined Daily Logging:** The daily calculator operates in-memory; saving a daily entry awaits persistence, updates or overwrites the single historical log entry for that date, and transitions the user to the 12-Month Calendar view only on success. Failed saves preserve editor drafts and display an error.
 
 * **Visual Calendar Distinction:** Visual distinction (color-coding) for weekends and standard US federal holidays.
 

@@ -2,20 +2,26 @@ import React, { useEffect, useRef, useState } from 'react';
 import { LeaveSettings } from '../types';
 import { MONTH_NAMES } from '../utils/calendar';
 
-export const LeavePolicyForm: React.FC<{ settings: LeaveSettings; onSave: (settings: LeaveSettings) => void }> = ({ settings, onSave }) => {
+export const LeavePolicyForm: React.FC<{ settings: LeaveSettings; onSave: (settings: LeaveSettings) => Promise<void> }> = ({ settings, onSave }) => {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   useEffect(() => { formRef.current?.reset(); }, [settings]);
   return <section className="calculator-card leave-policy" aria-labelledby="leave-policy-heading">
     <h3 id="leave-policy-heading" className="card-title">Leave & forecasts</h3>
-    <form ref={formRef} onSubmit={event => {
+    <form ref={formRef} onSubmit={async event => {
       event.preventDefault();
+      if (busy) return;
       const data = new FormData(event.currentTarget);
-      onSave({ openingMonth: String(data.get('openingMonth')), openingPto: Number(data.get('openingPto')),
+      setBusy(true); setError(''); setSaved(false);
+      try {
+      await onSave({ openingMonth: String(data.get('openingMonth')), openingPto: Number(data.get('openingPto')),
         openingHoliday: Number(data.get('openingHoliday')), openingBirthday: Number(data.get('openingBirthday')),
         birthdayMonth: Number(data.get('birthdayMonth')), workPercent: Number(data.get('workPercent')), autoPto: data.has('autoPto') });
       setSaved(true);
-    }}>
+      } catch (error) { setError(error instanceof Error ? error.message : 'Could not save settings.'); } finally { setBusy(false); }
+    }} onChange={() => setSaved(false)}><fieldset className="async-fields" disabled={busy}>
       <div className="report-settings-grid">
         <label>Opening balances at start of<input className="form-input" type="month" name="openingMonth" defaultValue={settings.openingMonth} required min="1900-01" max="2100-12" /></label>
         <label>Opening PTO (hours)<input className="form-input" type="number" name="openingPto" step="0.01" defaultValue={settings.openingPto} required /></label>
@@ -27,7 +33,8 @@ export const LeavePolicyForm: React.FC<{ settings: LeaveSettings; onSave: (setti
       <label className="checkbox-label"><input type="checkbox" name="autoPto" defaultChecked={settings.autoPto} />Auto-fill historical PTO gaps</label>
       <p className="settings-description">Enabled by default: unlogged weekday hours become PTO after holiday, birthday, and overhead hours. Empty months also count as PTO. An explicit PTO entry overrides that month's automatic amount.</p>
       <p className="settings-description">Forecasts use the future work rate on remaining non-holiday weekdays. PTO accrues at 0.0851 per hour worked; holiday credits and 8 birthday hours are added at the start of their month. Opening balances and leave entries are saved with the selected data source.</p>
-      <div className="sample-actions"><button type="submit" className="btn-primary">Save leave settings</button><span role="status">{saved ? 'Leave and forecast settings saved.' : ''}</span></div>
-    </form>
+      <div className="sample-actions"><button type="submit" className="btn-primary">{busy ? 'Saving…' : 'Save leave settings'}</button><span role="status">{saved ? 'Leave and forecast settings saved.' : ''}</span></div>
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </fieldset></form>
   </section>;
 };

@@ -66,9 +66,12 @@ try {
   await new Promise((resolve, reject) => { ws.addEventListener('open', resolve, { once: true }); ws.addEventListener('error', reject, { once: true }); });
   const exceptions = [];
   const networkErrors = [];
+  let checkingSample = false;
+  const sampleSupabaseRequests = [];
   ws.addEventListener('message', ({ data }) => {
     const message = JSON.parse(data);
     if (message.method === 'Runtime.exceptionThrown') exceptions.push(message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text);
+    if (checkingSample && message.method === 'Network.requestWillBeSent' && /\.supabase\.co(?:\/|$)/.test(message.params.request.url)) sampleSupabaseRequests.push(message.params.request.url);
     if (message.method === 'Network.loadingFailed') networkErrors.push(message.params.errorText);
     if (!message.id) return;
     const item = pending.get(message.id);
@@ -94,11 +97,12 @@ try {
     return result.result.value;
   };
   for (const [name, url, selector] of [
-    ['normal', site.href, '.calculator-view'],
+    ['normal', site.href, '.supabase-access'],
     ['sample', new URL('?sample=2026', site).href, '.year-calendar'],
     ['monthly', new URL('?sample=2026&view=monthly', site).href, '.monthly-view'],
     ['pop', new URL('?sample=2026&view=pop', site).href, '.pop-view'],
   ]) {
+    checkingSample = name !== 'normal';
     await send('Page.navigate', { url }, sessionId);
     let ready = false;
     for (let i = 0; i < 200; i++) {
@@ -138,6 +142,9 @@ try {
   if (!await evaluate(`!!document.querySelector('.settings-view input[value=sample2026]:checked') && !!document.querySelector('.settings-view .sample-coverage')`)) throw new Error('Settings is missing the active sample selection or coverage/downloads');
   if (!await evaluate(`document.querySelector('input[name=autoPto]')?.checked === true`)) throw new Error('Automatic historical PTO must be enabled by default');
   if (!await evaluate(`document.querySelectorAll('.pop-settings-table tbody tr').length === 24 && document.querySelector('[data-period="pop-x"]').textContent.includes('2027-06-30')`)) throw new Error('Settings must list all 24 fixed POP ranges');
+  if (sampleSupabaseRequests.length) throw new Error('Sample views made Supabase requests');
+  report.sampleIsolation = { supabaseRequests: sampleSupabaseRequests.length };
+  checkingSample = false;
   await evaluate(`document.querySelector('.dataset-selector input[value=personal]').click()`);
   for (let i = 0; i < 50 && !await evaluate(`!!document.querySelector('.settings-view input[value=personal]:checked')`); i++) await delay(100);
   if (!await evaluate(`!!document.querySelector('.settings-view input[value=personal]:checked') && !location.search.includes('sample')`)) throw new Error('Switching to personal data must stay in Settings and clear the sample query');
@@ -148,7 +155,7 @@ try {
   console.log('Chrome verified Settings sample controls and data-source switching.');
   if (exceptions.length) throw new Error(`Browser errors: ${exceptions.join('; ')}`);
   report.success = true;
-  console.log('Production HTTP, JavaScript/CSS, calculator, calendar, monthly report, POP report, and Settings checks passed.');
+  console.log('HTTP, JavaScript/CSS, sign-in gate, local sample calendar/monthly/POP, sample isolation, and Settings checks passed.');
 } catch (error) {
   report.success = false;
   report.error = error.message;

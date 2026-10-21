@@ -25,6 +25,7 @@ export function createSupabaseRepository(client: SupabaseClient, userId: string)
       for (let start = 0; ; start += pageSize) {
         const { data, error } = await client.from('timesheet_logs').select('*').eq('user_id', userId).order('date', { ascending: false }).range(start, start + pageSize - 1);
         check(error);
+        if (!data) throw new Error('Supabase returned no log data. Please reload.');
         logs.push(...(data as LogRow[]).map(mapLog));
         if (data.length < pageSize) break;
       }
@@ -35,17 +36,19 @@ export function createSupabaseRepository(client: SupabaseClient, userId: string)
     async saveLog(date: string, hours: number, notes?: string) {
       const { data, error } = await client.from('timesheet_logs').upsert({ user_id: userId, date, total_hours: roundToTenth(hours), notes: notes ?? null }, { onConflict: 'user_id,date' }).select().single();
       check(error);
+      if (!data) throw new Error('The entry was not saved. Please retry.');
       return mapLog(data as LogRow);
     },
     async deleteLog(date: string) {
       const { data, error } = await client.from('timesheet_logs').delete().eq('user_id', userId).eq('date', date).select('date');
       check(error);
-      if (!data.length) throw new Error('The entry could not be deleted. Reload your timesheet and try again.');
+      if (!data?.length) throw new Error('The entry could not be deleted. Reload your timesheet and try again.');
     },
     async saveReport(state: MonthlyReportState) {
       const report = { ...state, ptoPolicyVersion: 1 };
-      const { error } = await client.from('timesheet_reports').upsert({ user_id: userId, state: report }, { onConflict: 'user_id' });
+      const { data, error } = await client.from('timesheet_reports').upsert({ user_id: userId, state: report }, { onConflict: 'user_id' }).select('state').single();
       check(error);
+      if (!data) throw new Error('Leave settings were not saved. Please retry.');
       return report;
     },
     async importBrowserData(logs: TimeLog[], report: MonthlyReportState | null) {

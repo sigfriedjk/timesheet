@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ViewTab, TimeLog, MonthlyReportState } from './types';
-import { getAllTimeLogs, saveTimeLog, deleteTimeLog, getActiveLogDataset, setActiveLogDataset, initializeSampleLogs, LogDataset, getMonthlyReportState, saveMonthlyReportState } from './services/storage';
+import { ViewTab, TimeLog } from './types';
+import { getActiveLogDataset, setActiveLogDataset, LogDataset } from './services/storage';
+import { useSupabaseConnection } from './hooks/useSupabaseConnection';
+import { useWorkspace } from './hooks/useWorkspace';
+import { SupabaseAccess } from './components/SupabaseSettings';
 import { Navigation } from './components/Navigation';
 import { DailyCalculator } from './components/DailyCalculator';
 import { CalendarView } from './components/CalendarView';
@@ -16,12 +19,14 @@ interface ToastMessage {
 }
 
 export const App: React.FC = () => {
-  const [logs, setLogs] = useState<TimeLog[]>([]);
   const [dataset, setDataset] = useState<LogDataset>(() =>
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('sample') === '2026'
       ? 'sample2026' : getActiveLogDataset()
   );
-  const [reportState, setReportState] = useState<MonthlyReportState>(() => getMonthlyReportState(dataset));
+  const connection = useSupabaseConnection(dataset === 'personal');
+  const workspace = useWorkspace(dataset, connection.client, connection.session?.user.id);
+  const { logs, report: reportState } = workspace;
+  const viewIdentity = `${dataset}:${connection.config?.url}:${connection.session?.user.id ?? ''}`;
   const [currentTab, setCurrentTab] = useState<ViewTab>(() => {
     const view = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('view') : null;
     return view && ['calculator', 'calendar', 'monthly', 'pop', 'settings'].includes(view)
@@ -29,16 +34,7 @@ export const App: React.FC = () => {
   });
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
-  useEffect(() => {
-    setLogs(dataset === 'sample2026' ? initializeSampleLogs() : getAllTimeLogs());
-    setActiveLogDataset(dataset);
-    setReportState(getMonthlyReportState(dataset));
-  }, [dataset]);
-
-  const updateReportState = (state: MonthlyReportState) => {
-    saveMonthlyReportState(state, dataset);
-    setReportState(state);
-  };
+  useEffect(() => { setActiveLogDataset(dataset); }, [dataset]);
 
   const showToast = (text: string, type: 'success' | 'info' | 'warning' = 'success') => {
     setToast({ id: Date.now().toString(), type, text });
@@ -47,36 +43,30 @@ export const App: React.FC = () => {
     }, 4500);
   };
 
-  const handleLogSaved = (logData: TimeLog) => {
-    const { log, isOverwrite } = saveTimeLog(
-      logData.date,
-      logData.totalHours,
-      logData.notes,
-      dataset
-    );
-    setLogs(getAllTimeLogs(dataset));
-
-    const message = isOverwrite
-      ? `Overwrote log for ${log.date}: updated to ${log.totalHours.toFixed(1)} hrs`
-      : `Successfully logged ${log.totalHours.toFixed(1)} hrs for ${log.date}`;
-
-    showToast(message, 'success');
-
+  const handleLogSaved = async (logData: TimeLog) => {
+    const isOverwrite = logs.some(log => log.date === logData.date);
+    const log = await workspace.saveLog(logData.date, logData.totalHours, logData.notes);
+    showToast(`${isOverwrite ? 'Updated' : 'Logged'} ${log.totalHours.toFixed(1)} hrs for ${log.date}`);
     setCurrentTab('calendar');
   };
 
-  const handleDeleteLog = (date: string) => {
+  const handleDeleteLog = async (date: string) => {
     if (window.confirm(`Are you sure you want to delete the time log for ${date}?`)) {
-      deleteTimeLog(date, dataset);
-      setLogs(getAllTimeLogs(dataset));
+      await workspace.deleteLog(date);
       showToast(`Deleted entry for ${date}`, 'info');
     }
   };
 
-  const handleCalendarSave = (date: string, hours: number, notes: string) => {
-    saveTimeLog(date, hours, notes, dataset);
-    setLogs(getAllTimeLogs(dataset));
+  const handleCalendarSave = async (date: string, hours: number, notes: string) => {
+    await workspace.saveLog(date, hours, notes);
     showToast(`Saved ${hours.toFixed(1)} hrs for ${date}`);
+  };
+
+  const useSampleData = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('sample', '2026');
+    window.history.replaceState(null, '', url);
+    setDataset('sample2026');
   };
 
   const usePersonalData = () => {
@@ -115,15 +105,16 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="main-content">
-        <div className="content-container">
-          {currentTab === 'calculator' && (
+        <div className="content-container" key={viewIdentity}>
+          {currentTab !== 'settings' && !workspace.ready && <SupabaseAccess connection={connection} workspace={workspace} onOpenSettings={() => setCurrentTab('settings')} />}
+          {workspace.ready && currentTab === 'calculator' && (
             <DailyCalculator
               onLogSaved={handleLogSaved}
               existingLogs={logs}
             />
           )}
 
-          {currentTab === 'calendar' && (
+          {workspace.ready && currentTab === 'calendar' && (
             <CalendarView
               key={dataset}
               logs={logs}
@@ -134,18 +125,20 @@ export const App: React.FC = () => {
             />
           )}
 
-          {currentTab === 'monthly' && <MonthlySummaryView key={dataset} logs={logs} state={reportState} isSample={dataset === 'sample2026'} onChange={updateReportState} onOpenSettings={() => setCurrentTab('settings')} />}
+          {workspace.ready && currentTab === 'monthly' && <MonthlySummaryView key={dataset} logs={logs} state={reportState} isSample={dataset === 'sample2026'} onChange={workspace.saveReport} onOpenSettings={() => setCurrentTab('settings')} />}
 
-          {currentTab === 'pop' && <PopSummaryView key={dataset} logs={logs} isSample={dataset === 'sample2026'} onOpenSettings={() => setCurrentTab('settings')} />}
+          {workspace.ready && currentTab === 'pop' && <PopSummaryView key={dataset} logs={logs} isSample={dataset === 'sample2026'} onOpenSettings={() => setCurrentTab('settings')} />}
 
           {currentTab === 'settings' && (
             <SettingsView
               isSample={dataset === 'sample2026'}
               leaveSettings={reportState.settings}
-              onSaveLeaveSettings={settings => updateReportState({ ...reportState, settings })}
-              onUseSample={() => setDataset('sample2026')}
+              onSaveLeaveSettings={async settings => { await workspace.saveReport({ ...reportState, settings }); }}
+              onUseSample={useSampleData}
               onUsePersonal={usePersonalData}
-              onResetSample={() => { const restored = initializeSampleLogs(true); setLogs(restored); setReportState(getMonthlyReportState(dataset)); return restored.length; }}
+              onResetSample={workspace.resetSample}
+              connection={connection}
+              workspace={workspace}
             />
           )}
         </div>

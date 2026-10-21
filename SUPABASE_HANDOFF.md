@@ -1,76 +1,83 @@
-# Supabase integration checkpoint — October 21, 2026
+# Supabase integration handoff — October 21, 2026
 
-## Resume from this branch
+## Resume here
 
-Repository: https://github.com/sigfriedjk/timesheet
+- Repository: https://github.com/sigfriedjk/timesheet
+- Branch: `wip/supabase-integration-20261021` — check it out and read this file first.
+- Production: https://sigfriedjk.github.io/timesheet/
+- Production/base commit: `17d7bb8303df2d04528b512f6d6d14bf3c2bbd56`.
+- Initial draft checkpoint: `3c79366f5b9f0b1a2baef1f472f01a2070274208`.
 
-Branch: `wip/supabase-integration-20261021`
+**No Supabase schema changes, Auth configuration changes, or production deployment have been made.** The implementation now builds and passes local integration tests, but live setup/verification remains blocked. The user requested this handoff so they can change the network policy and open a new conversation in the new environment. Deployment is already authorized once the integration is verified and ready; do not deploy an unverified backend integration.
 
-Production: https://sigfriedjk.github.io/timesheet/
+## User goal and security requirements
 
-Base production commit: `17d7bb8303df2d04528b512f6d6d14bf3c2bbd56`.
+Use `@supabase/supabase-js` as the default personal-data store. Sample mode must remain fully client-side, work without signing in/offline, and never touch Supabase. Preserve calculator, calendar, monthly leave/forecast, and POP behavior. Keep existing personal browser records available for explicit, atomic, non-destructive import; existing cloud rows/settings take priority.
 
-This is an unfinished checkpoint, not a deployable release. The user paused implementation to republish the cloud environment with `SUPABASE_SECRET_KEY`, then requested that the draft be committed with a handoff prompt. Nothing in this checkpoint has been deployed, and no Supabase database or authentication configuration changes have been made by the assistant. Do not infer that the SQL has been run: the user explicitly paused that request.
+Project URL: `https://yiqquogdutgujsacoezh.supabase.co` (base URL, not `/rest/v1/`). Public browser configuration is in `src/config/supabasePublic.ts`, with `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`/legacy `VITE_SUPABASE_ANON_KEY`, and Settings overrides.
 
-## User's goal
+Keep `SUPABASE_SECRET_KEY` server-side. Never print its value, put it in `VITE_*`, source, browser storage, bundles, screenshots, or committed configuration. A project secret normally authorizes privileged Data API/Auth admin calls. It is **not** a Management API access token or PostgreSQL connection password and does not grant arbitrary SQL execution. Determine actual authorization with supported APIs; do not invent SQL RPCs or misuse a project key as a Management token.
 
-Use Supabase's client-side JavaScript library for personal timesheet data by default. Keep the sample workspace entirely client-side, available without signing in, and isolated from real data. Preserve all existing calculator, calendar, monthly leave, and POP summary behavior. Production publication has been authorized throughout the project, but finish and verify the integration before publishing it.
+## Environment observations at handoff
 
-Project base URL: `https://yiqquogdutgujsacoezh.supabase.co`.
+Fresh process checks and the environment-status tool both still showed:
 
-The user provided the public publishable key, which is already in `src/config/supabasePublic.ts`. Their original URL ended with `/rest/v1/`; use the base project URL with the JavaScript client. Public browser config can be overridden with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (or legacy `VITE_SUPABASE_ANON_KEY`) or the draft Settings form.
+- `SUPABASE_SECRET_KEY`: absent; no Supabase-related process variables at all.
+- Secret bindings: empty.
+- `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`: present/nonempty (values never printed). `AWS_SESSION_TOKEN`, `AWS_REGION`, `AWS_DEFAULT_REGION`: absent.
+- Status listed only the AWS variables; their readiness was `unknown`.
+- Restricted network policy listed package/GitHub presets plus `sigfriedjk.github.io`. The Supabase project hostname was absent. The status tool reported network policy state `unknown`; the local `/etc/codex/network-policy.json` had no Supabase rules and no VPN/TCP grants.
+- Environment revision was 2. User was troubleshooting why the republished configuration had not reached this runtime.
 
-## Environment secret and access
+For the new environment, bind the secret and allow **`yiqquogdutgujsacoezh.supabase.co`** explicitly (or a supported wildcard covering it). Adding the apex `supabase.co` may not cover its subdomains. If using the Management API, also allow **`api.supabase.com`** and bind a suitable **`SUPABASE_ACCESS_TOKEN`**. Alternatively, use authorized PostgreSQL credentials/connectivity or have the user run the migration in the SQL Editor and configure Auth in the dashboard.
 
-The user added an environment variable named `SUPABASE_SECRET_KEY`. At checkpoint time, `Boolean(process.env.SUPABASE_SECRET_KEY)` was false and the environment status reported no secret bindings. They intend to republish the environment to make it available.
+Read the cloud-environment-runtime skill and current network policy before network work. Recheck status and credential presence without printing values. Never bypass destination restrictions. Shell network commands in this conversation required `sandbox_permissions: with_additional_permissions` with `additional_permissions.network.enabled: true`; without that, even the allowed GitHub proxy connection failed. This sandbox grant does not change destination policy. `npm ci --cache /workspace/.npm-cache` works.
 
-After restarting, check environment status and the variable's presence without printing its value. Keep this key server-side in the execution environment. Never put it in any `VITE_*` variable, source file, browser bundle, committed configuration, log, or screenshot. The browser must use the public publishable key plus a user's Supabase Auth session and RLS.
+## Completed implementation
 
-A Supabase project secret key usually grants privileged data API access; it is not automatically a Supabase Management API access token or a PostgreSQL connection credential. Determine which operations the available credential actually authorizes before attempting schema setup. Do not assume the secret can execute arbitrary SQL or change Auth settings. If admin access remains unavailable, explain the exact missing capability and provide the already-prepared SQL for the user to run.
+- `src/App.tsx` now uses `useSupabaseConnection` and `useWorkspace`. Fresh normal visits select personal Supabase data; explicit sample query/Settings selection uses only the sample store. Previously selected sample mode still persists as before.
+- Personal calculator/calendar/monthly/POP views wait for auth recovery and successful cloud loading. Load errors provide retry. No personal local-storage fallback.
+- Account/source/project identity changes clear previous data and remount drafts. Late recovery/load/save results cannot repopulate a changed workspace or trigger stale success/navigation. Writes reject overlapping operations and use the latest snapshot.
+- Calculator, day editor, month editor, deletes, leave settings, and import await persistence. Failure messages preserve drafts/dialogs; success/navigation happens only after acknowledgement; controls disable while saving.
+- Auth clients are created in an effect only for personal mode. Auth events outrank late getSession results; StrictMode cleanup unsubscribes and calls the SDK's `auth.dispose()`, including after late initialization. The installed SDK is 2.118.x and supports dispose.
+- Repository nullability/build errors fixed. History uses 500-row pages; requests include user scoping. Log/report writes require returned acknowledgements; delete requires a returned row. Notes can be cleared.
+- Legacy report import normalizes old policy shape without mutating the browser original. Import uses the prepared security-invoker RPC; no automatic import or sample import.
+- Added cloud access/setup/error styles and checked 390px/1280px screenshots. Sample controls remain in Settings.
+- Vite fails before bundling recognized privileged values in `VITE_*` configuration. Only public browser configuration is imported by app source.
+- README, architecture, and design docs explain cloud defaults, explicit migration, offline samples, and verification limits.
 
-Read the managed environment runtime instructions and current network policy before network work. The prior policy allowed package registries and GitHub, but did not list the Supabase project host; check the republished environment's current policy. Do not bypass destination restrictions. `npm install --cache /workspace/.npm-cache` works in this workspace; the default home cache path was unavailable. Public GitHub fetch worked with ordinary git at checkpoint time; connected GitHub tools also support commits and branches.
+## Database and server-only tooling
 
-## Draft implementation already saved
+`supabase/migrations/202610210001_timesheet.sql` remains **unapplied to the real project**. It creates `timesheet_logs`, `timesheet_reports`, owner RLS policies, timestamp triggers, and atomic `import_browser_timesheet`. It is repeatable and transactional. POP definitions remain static shared configuration.
 
-- `package.json` and `package-lock.json`: installed `@supabase/supabase-js` 2.118.0.
-- `src/config/supabasePublic.ts`, `src/services/supabaseConfig.ts`, `.env.example`, `src/vite-env.d.ts`: public configuration, browser overrides, and rejection of secret/service-role keys in the browser form.
-- `supabase/migrations/202610210001_timesheet.sql`: transactional, repeatable setup for `timesheet_logs`, `timesheet_reports`, per-user RLS, updated-at triggers, and an atomic `import_browser_timesheet` RPC. It is prepared but not applied or tested against a real project.
-- `src/services/supabaseRepository.ts`: paged reads (500 rows per page), user-scoped log upsert/delete, report JSON persistence, and an import RPC preserving existing cloud dates/settings.
-- `src/hooks/useSupabaseConnection.ts`: draft session recovery, persisted Supabase Auth sessions, and client creation only when personal data is selected. It needs lifecycle/session-race review and testing.
-- `src/hooks/useWorkspace.ts`: draft async repository/local-sample routing, loading/error states, guarded updates after source/user changes, save serialization, and an explicit browser-data import action. Review carefully; not wired into App yet.
-- `src/components/SupabaseSettings.tsx`: draft email magic-link sign-in, sign-out, public connection configuration, local-browser import, SQL copy/download, and setup instructions. Not wired into App yet.
-- `src/components/SettingsView.tsx`: now expects `connection`, `workspace`, and an async leave-settings callback; it renders the draft Supabase panel. App still supplies the old props, so the checkpoint does not build.
-- `.gitignore`: excludes `work/`, which contains disposable browser profiles, scratch scripts, screenshots, and local verification artifacts. Do not commit those files.
+- `npm run setup:supabase`: server-only `scripts/setup-supabase.mjs`. Requires `SUPABASE_ACCESS_TOKEN`; reads Management API Auth config, runs the migration through the supported database/query endpoint, sets Site URL to `https://sigfriedjk.github.io/timesheet/`, merges `https://sigfriedjk.github.io/timesheet/**` into existing redirects, and reads config back. Does not use `SUPABASE_SECRET_KEY` as a SQL credential. Syntax checked only; not run against live Supabase.
+- `npm run verify:supabase`: server-only `scripts/verify-supabase.mjs`. Requires the project secret/service-role binding, uses the configured proxy via undici, checks the Data API, creates two temporary confirmed Auth users (`timesheet-verification-*@example.invalid`) **without sending email**, and signs them in with normal public-key clients to test RLS/CRUD/import. Tests anonymous denial, cross-user read/write/delete denial, report preservation, import conflicts/rollback, and ignores spoofed import user IDs. Cleans up temporary users in finally. Failed cleanup explicitly requires dashboard inspection. It never reads existing personal rows for the initial capability check (`limit(0)`).
+- The live script was attempted here and stopped immediately because both Supabase credential variables were absent. No remote calls or changes occurred. Do not treat a script's presence or syntax check as successful live verification.
+- The browser Settings panel also provides SQL copy/download and manual Auth URL instructions. Do not send sign-in emails on the user's behalf. The user can request a magic link through the UI for a final email/redirect check.
 
-The public project key is intentionally browser-safe; no environment secret is present in this checkpoint.
+## Verification completed locally
 
-## Verification at checkpoint
+- `npm run build`: passed (TypeScript and Vite).
+- `npm test`: **73 tests passed**, covering all 50 existing calculation/storage tests plus public config rejection, real supabase-js request behavior against mocked HTTP, pagination, report persistence, auth recovery/sign-out/account/project changes/StrictMode, workspace stale results/concurrency/failures/sample isolation/import, and SQL policies.
+- `supabase/migration.test.ts` executes the real migration twice on embedded PostgreSQL (PGlite). It verifies anonymous table/RPC denial; two user identities under the authenticated role; cross-user reads/inserts/updates/deletes/report writes; ownership-changing writes; import ownership/conflict preservation; atomic rollback; and report-shape validation. This is actual local PostgreSQL execution with a small simulated auth schema, **not a real Supabase project/Auth verification**.
+- `npm run test:browser`: **8 Chromium tests passed**. Real app + real SDK, mocked backend: unauthenticated gate, cloud load/session recovery, failed calculator/day/month/leave saves retaining drafts, retry/save/delete/sign-out behavior, offline sample calculator/calendar/monthly/POP/Settings with **zero Supabase requests**, 390px and 1280px layout. Config: `playwright.config.ts`; tests: `tests/browser/workspace.spec.ts`. Uses `/usr/bin/chromium`, optional `CHROME_PATH`, or Playwright's installed browser. No live backend claim.
+- `scripts/verify-production.mjs` was updated to expect the sign-in gate and assert zero Supabase calls from sample views. Its normal/sample/Settings production smoke checks still need to be run against a local build and after deployment.
+- Server-only setup/live scripts passed `node --check`. A synthetic `VITE_SUPABASE_PUBLISHABLE_KEY=sb_secret_...` build was correctly rejected before bundling.
+- Disposable screenshots/profiles/results are under ignored `work/`; do not commit them.
 
-`npm test`: all 50 existing tests pass. These cover existing local storage and calculator/calendar/monthly/POP calculations; they do not verify the new Supabase integration.
+## Next steps in the new conversation
 
-`npm run build`: fails with these reported TypeScript errors:
+1. Check out the branch and read this handoff. Confirm the correct new environment has the secret binding and hostname access, without printing values. Determine real administrative capabilities. If only the project secret is available, test Data API/Auth admin authorization, but obtain SQL/Management access separately or use the SQL Editor/dashboard.
+2. Apply the migration with authorized SQL access and configure/verify Auth Site URL + redirect allowlist. Preserve existing unrelated redirects. Never run arbitrary SQL with a presumed secret-key capability.
+3. Run the server-only live verifier, inspect/fix actual errors, and confirm all temporary users are cleaned up. Verify full auth session recovery, refresh, account switching, and real cloud read/write behavior. Have the user request/open their own magic link for email delivery/redirect verification; do not send emails yourself.
+4. Run `npm ci --cache /workspace/.npm-cache`, `npm test`, `npm run build`, and `npm run test:browser` as needed for the new environment. Inspect any final diff and test gaps; the code has not had a separate reviewer. Browser/backend mocks cannot establish live readiness.
+5. Run the updated production smoke script against a local built preview. Check browser credentials are public and no privileged secret is in generated assets (compare in memory without printing values).
+6. Once live backend, Auth, browser, and build checks are satisfactory, merge/publish to `main`. Pushes to main trigger `.github/workflows/deploy.yml`; the WIP branch does not deploy automatically. Verify the Actions result and actual production URL/assets/sample isolation. Deployment is authorized when ready, not before verification.
 
-1. `src/App.tsx:145`: a synchronous leave-settings callback returns void where `Promise<void>` is now required.
-2. `src/services/supabaseRepository.ts:29`: `data` may be null after a query.
-3. `src/services/supabaseRepository.ts:43`: `data` may be null after a delete.
+## Existing behavior to preserve
 
-More wiring issues may appear after fixing those errors. Do not treat passing legacy tests as evidence the Supabase draft is complete.
+React 18 + TypeScript + Vite, static GitHub Pages. Daily inputs use 24-hour times, separate actual time-out from helper cards, and six-minute break adjustments. Saving transitions to Calendar only on success. Sample: January 1–October 20, 2026; 149 entries; 1,210.7 hours; February/August empty. Monthly historical gaps default to PTO unless explicit PTO entries (including zero) override inference; versioned policy migration preserves later opt-outs. Fixed POP A–X definitions span April 25, 2024–June 30, 2027; 2026 sample totals: 1,915 funded, 1,210.7 worked, 704.3 remaining hours.
 
-## Remaining implementation
+## Prompt to paste in the new conversation
 
-1. Check the new secret and actual administrative capabilities. Apply and verify the SQL schema when authorized access permits. Configure Supabase Auth Site URL to `https://sigfriedjk.github.io/timesheet/` and allow redirect URL `https://sigfriedjk.github.io/timesheet/**` if magic-link auth is retained. Do not send sign-in emails on behalf of the user; the UI can let them request a link themselves.
-2. Review SQL/RLS with two users and an unauthenticated client; verify cross-user reads/writes and imports are denied. Privileged secret-key requests bypass RLS and cannot prove user isolation.
-3. Wire `useSupabaseConnection` and `useWorkspace` into `src/App.tsx`. It still uses synchronous personal localStorage today. Personal data should default to Supabase. Sample data should initialize only its local store, never touch Supabase tables, and remain usable offline. Use explicit `?sample=2026`/Settings selection for sample mode; normal fresh visits should use Supabase.
-4. Gate personal views on auth and completed data loading, expose retry on load failures, clear previous-user data when accounts/sources/projects change, and avoid silently falling back to browser storage for failed cloud writes.
-5. Convert calculator, calendar day editor, monthly editor, and leave-settings form callbacks to await persistence. Preserve drafts and dialogs on failure, report errors, prevent duplicate saves, and navigate to the calendar or show success only after a successful save. Review `useWorkspace` snapshot and concurrency handling.
-6. Preserve existing personal browser records and report settings. Import should be explicit for the signed-in user, atomic, non-destructive, and prefer existing cloud rows/settings. Never import the sample workspace. POP definitions remain hardcoded and shared.
-7. Fix query nullability, inspect Auth lifecycle/StrictMode behavior, and test session recovery, sign-out, account changes, errors, long history pagination, report persistence, import conflicts, and sample isolation. Add meaningful Supabase tests; existing test suite alone is insufficient.
-8. Add CSS for the draft Supabase access/settings/forms, SQL display, and loading/error states; check desktop and mobile layouts.
-9. Update README/design documentation and production smoke checks. `scripts/verify-production.mjs` currently expects an unauthenticated normal visit to render the calculator; that must change if personal views require sign-in. Preserve sample calculator/calendar/monthly/POP checks and verify sample mode makes no Supabase requests.
-10. Build, test, verify live backend behavior and browser flows, then merge/publish the completed integration to production and verify the production URL and assets. The Pages workflow deploys pushes to `main`; this WIP branch does not deploy automatically.
-
-## Existing app context
-
-React 18, TypeScript, Vite; static GitHub Pages hosting. Daily inputs use 24-hour times, separate actual time-out from reference helper cards, and 6-minute break adjustments. Save transitions to Calendar. Sample logs cover January 1–October 20, 2026: 149 entries, 1,210.7 hours, February/August empty. Sample controls and downloads belong only in Settings.
-
-Monthly report state includes opening balances, leave settings/entries, projected work, and a versioned automatic-PTO migration. Historical gaps default to PTO, including empty months, but explicit monthly PTO entries (including zero) override inference. Preserve subsequent opt-outs and personal/sample isolation. Fixed POP A–X definitions are in `src/config/periodsOfPerformance.ts`; 2026 sample POP totals are 1,915 funded, 1,210.7 worked, and 704.3 remaining hours. The 24 POPs span April 25, 2024–June 30, 2027.
+Resume the Supabase integration in github.com/sigfriedjk/timesheet. Check out `wip/supabase-integration-20261021` and read `SUPABASE_HANDOFF.md` first. The new environment should expose `SUPABASE_SECRET_KEY` and permit the Supabase project hostname; check both without printing the secret. Keep privileged credentials server-side. Finish live database/Auth setup and verification using the credential's actual capabilities; a project secret is not a Management API token or arbitrary-SQL credential. The app builds and local unit/PostgreSQL/browser tests pass, but no schema/Auth changes or deployment have been made. Complete the remaining checks, then deploy when ready.

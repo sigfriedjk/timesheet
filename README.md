@@ -8,7 +8,7 @@
 
 A dedicated, streamlined single-user time tracking web application designed to replace spreadsheet-based work logs with instant calculations, shift projections, and leave accrual management.
 
-Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScript), containerized with **Docker Desktop**, and architected for **Supabase** backend synchronization.
+Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScript), containerized with **Docker Desktop**, and using **Supabase** as the default personal-data store (integration branch; live setup verification is pending).
 
 ---
 
@@ -50,10 +50,29 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
 
 5. **Domain Types & Architectural Scaffolding:**
    * Fully typed domain entities (`TimeLog`, `PeriodOfPerformance`, `LeaveAdjustment`).
-   * Local-first persistence repository ready for Supabase client synchronization.
+   * Supabase Auth and user-scoped persistence for personal logs and report state; sample data remains local.
    * Navigation tabs for all 5 core application interfaces.
 
 ---
+
+## Supabase personal data
+
+Fresh visits use the configured Supabase project and require an email sign-in link before opening personal views. Browser credentials are public publishable/legacy anon keys; database RLS enforces per-user access. Sample mode creates no Supabase client and works without signing in or a network connection.
+
+Run `supabase/migrations/202610210001_timesheet.sql` in the Supabase SQL Editor, then set Auth Site URL to `https://sigfriedjk.github.io/timesheet/` and allow `https://sigfriedjk.github.io/timesheet/**`. Preserve other redirect entries. For local magic-link testing, also allow the local application URL. The server-only `npm run setup:supabase` script can apply the migration and configure production Auth URLs when `SUPABASE_ACCESS_TOKEN` provides Management API access. A project `SUPABASE_SECRET_KEY` is **not** a Management API token or PostgreSQL password and cannot substitute for arbitrary SQL execution.
+
+Public defaults are in `src/config/supabasePublic.ts`; override them with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (or `VITE_SUPABASE_ANON_KEY`), or Settings. Privileged credentials must stay in the execution environment. Never place a secret/service-role key, Management API token, or database password in `VITE_*`, source, browser storage, screenshots, or logs. Vite rejects recognized privileged browser configuration before bundling.
+
+Existing personal browser data is preserved. After signing in, use **Settings → Import existing browser data** explicitly. One transactional RPC imports missing dates/report state, preserves existing cloud rows/settings, and leaves browser originals intact. Cloud write failures remain visible in the editor; they never fall back to local personal storage. Account, project, and source changes clear previous data and drafts.
+
+Verification:
+
+- `npm test`: calculation/storage, real SDK request contracts, auth/workspace lifecycle, and embedded PostgreSQL migration/RLS/import tests.
+- `npm run test:browser`: Chromium UI tests with mocked backend responses, including failure recovery, sample isolation, and desktop/mobile layout. Set `CHROME_PATH` if necessary, or install Chromium with Playwright.
+- `npm run verify:supabase`: **live** project verification using a server-side `SUPABASE_SECRET_KEY`. Creates and cleans up two temporary confirmed Auth users without sending email; uses their ordinary sessions to verify RLS, CRUD, and imports. Requires the project host in the environment network policy. This does not configure schema or verify real email delivery.
+- `node scripts/verify-production.mjs [URL]`: static assets, unauthenticated access gate, sample calendar/monthly/POP, Settings, and no sample Supabase requests.
+
+See `SUPABASE_HANDOFF.md` for current deployment readiness. Local mocked/embedded tests alone do not establish live backend readiness.
 
 ## 2026 Sample Data
 

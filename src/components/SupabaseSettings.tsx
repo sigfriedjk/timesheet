@@ -13,7 +13,7 @@ export const SupabaseSignIn: React.FC<{ connection: SupabaseConnection }> = ({ c
   const [error, setError] = useState('');
   return <form className="supabase-sign-in" onSubmit={async event => {
     event.preventDefault();
-    if (!connection.client) return;
+    if (!connection.client || busy || !connection.authReady) return;
     setBusy(true); setStatus(''); setError('');
     try {
       const redirect = new URL('.', window.location.href);
@@ -45,9 +45,10 @@ export const SupabaseSettings: React.FC<{ connection: SupabaseConnection; worksp
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const legacyLogs = getAllTimeLogs();
-  const hasLegacy = legacyLogs.length > 0 || getLegacyReport() != null;
+  const legacyLogs = isSample ? [] : getAllTimeLogs();
+  const hasLegacy = !isSample && (legacyLogs.length > 0 || getLegacyReport() != null);
   const run = async (action: () => Promise<void>) => {
+    if (busy) return;
     setBusy(true); setError(''); setStatus('');
     try { await action(); } catch (error) { setError(message(error)); } finally { setBusy(false); }
   };
@@ -58,7 +59,7 @@ export const SupabaseSettings: React.FC<{ connection: SupabaseConnection; worksp
       <p>Signed in as <strong>{connection.session.user.email}</strong></p>
       <div className="sample-actions"><button type="button" className="btn-secondary" disabled={busy} onClick={() => void run(async () => { const { error } = await connection.client!.auth.signOut({ scope: 'local' }); if (error) throw error; })}>Sign out</button><button type="button" className="btn-secondary" disabled={busy || workspace.busy} onClick={workspace.reload}>Reload Supabase data</button></div>
       {workspace.error && <p className="form-error" role="alert">{workspace.error}</p>}
-      {hasLegacy && <div className="browser-import"><p>{legacyLogs.length} existing personal browser entries are available to import. Missing dates and settings will be added; existing Supabase entries and settings take priority. Browser originals are kept.</p><button type="button" className="btn-secondary" disabled={busy || !workspace.ready} onClick={() => void run(async () => { const count = await workspace.importBrowser(); setStatus(`Imported ${count} missing browser entries. Existing cloud data was kept.`); })}>Import existing browser data</button></div>}
+      {hasLegacy && <div className="browser-import"><p>{legacyLogs.length} existing personal browser entries are available to import. Missing dates and settings will be added; existing Supabase entries and settings take priority. Browser originals are kept.</p><button type="button" className="btn-secondary" disabled={busy || workspace.busy || !workspace.ready} onClick={() => void run(async () => { const count = await workspace.importBrowser(); setStatus(`Imported ${count} missing browser entries. Existing cloud data was kept.`); })}>Import existing browser data</button></div>}
     </> : connection.config ? <SupabaseSignIn connection={connection} /> : <p>Enter your public project connection details below.</p>}
     {connection.error && <p className="form-error" role="alert">{connection.error}</p>}
     <details className="supabase-setup"><summary>Project connection & one-time setup</summary>
