@@ -577,7 +577,7 @@ body {
 }
 
 .target-num-input {
-  width: 55px;
+  width: 80px;
   padding: 0.25rem 0.4rem;
   font-size: 0.8rem;
   background-color: var(--bg-surface);
@@ -608,6 +608,8 @@ body {
 
 .target-card-top {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.5rem;

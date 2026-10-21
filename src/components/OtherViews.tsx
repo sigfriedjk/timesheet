@@ -6,9 +6,6 @@ export const MonthlySummaryView: React.FC = () => {
       <div className="view-header">
         <div>
           <h2>Monthly Summary & Leave Tracking</h2>
-          <p className="view-description">
-            Interface 3: Monthly hours aggregation, worked leave accruals (0.0851 rate), holiday/birthday credits, and running net balance.
-          </p>
         </div>
       </div>
 
@@ -45,9 +42,6 @@ export const PopSummaryView: React.FC = () => {
       <div className="view-header">
         <div>
           <h2>Period of Performance (POP) Summary</h2>
-          <p className="view-description">
-            Interface 4: Custom date-range aggregations, target hours burn-down, and completion percentages.
-          </p>
         </div>
       </div>
 
@@ -81,9 +75,6 @@ export const SettingsView: React.FC = () => {
       <div className="view-header">
         <div>
           <h2>POP & System Settings</h2>
-          <p className="view-description">
-            Interface 5: Management of contract POP ranges and manual leave adjustments (Column U in spreadsheet).
-          </p>
         </div>
       </div>
 

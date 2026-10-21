@@ -51,7 +51,6 @@ export const Navigation: React.FC<NavigationProps> = ({
           </div>
           <div className="brand-text">
             <h1>Work Hours Tracker</h1>
-            <span className="brand-subtitle">GitHub Pages + Jamstack</span>
           </div>
         </div>
 

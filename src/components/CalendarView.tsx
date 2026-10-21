@@ -41,9 +41,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       <div className="view-header">
         <div>
           <h2>12-Month Calendar & Historical Entries</h2>
-          <p className="view-description">
-            Interface 2: Inspection and editing of daily logs with weekend tinting and federal holiday indicators.
-          </p>
         </div>
         <div className="header-actions">
           <button

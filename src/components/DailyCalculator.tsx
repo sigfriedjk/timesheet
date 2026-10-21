@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   calculateWorkedHours,
   calculateTargetTimeOut,
-  roundToTenth,
   timeStringToMinutes,
   formatTime12Hour,
   getTodayDateString,
@@ -17,7 +16,6 @@ import {
   AlertTriangle,
   Sparkles,
   Calendar as CalendarIcon,
-  HelpCircle,
   FileText,
 } from 'lucide-react';
 
@@ -35,9 +33,10 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
   const [timeIn, setTimeIn] = useState<string>('08:00');
   const [timeOut, setTimeOut] = useState<string>('');
   const [breakMinutes, setBreakMinutes] = useState<number>(30);
-  const [customTarget, setCustomTarget] = useState<number>(8.5);
+  const [targetHoursInput, setTargetHoursInput] = useState<string>('8.5');
   const [notes, setNotes] = useState<string>('');
   const [autoTransition, setAutoTransition] = useState<boolean>(true);
+  const [showProgress, setShowProgress] = useState<boolean>(false);
   const [currentTimeStr, setCurrentTimeStr] = useState<string>(getCurrentTimeString());
 
   // Update current time clock every 10 seconds for real-time calculations
@@ -62,37 +61,26 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
     return calculateWorkedHours(timeIn, effectiveTimeOut, breakMinutes);
   }, [timeIn, effectiveTimeOut, breakMinutes]);
 
-  // Calculations for target goals (8.0, 9.6, and Custom)
-  const targets = useMemo(() => {
-    const goals = [
-      { hours: 8.0, label: 'Standard Shift (8.0 hrs)' },
-      { hours: 9.6, label: '9/80 Long Shift (9.6 hrs)' },
-      { hours: customTarget, label: `Custom Goal (${roundToTenth(customTarget)} hrs)` },
-    ];
+  // Project departure time and progress for the entered target hours.
+  const target = useMemo(() => {
+    const hours = Number(targetHoursInput);
+    if (!Number.isFinite(hours) || hours < 0.1 || hours > 24) return null;
 
-    const currentMinutesFromMidnight = isUsingCurrentTime
-      ? timeStringToMinutes(currentTimeStr) || 0
-      : timeStringToMinutes(timeOut) || 0;
+    const calc = calculateTargetTimeOut(timeIn, hours, breakMinutes);
+    if (!calc) return null;
 
-    return goals.map((g) => {
-      const calc = calculateTargetTimeOut(timeIn, g.hours, breakMinutes);
-      const targetMin = calc ? calc.totalTargetMinutesFromMidnight : 0;
-      let remaining = targetMin - currentMinutesFromMidnight;
-      if (remaining < 0) remaining = 0;
+    const inMinutes = timeStringToMinutes(timeIn)!;
+    let endMinutes = timeStringToMinutes(effectiveTimeOut) ?? 0;
+    if (endMinutes < inMinutes) endMinutes += 1440;
 
-      const progress =
-        g.hours > 0 ? Math.min(100, Math.max(0, (workedCalc.roundedHours / g.hours) * 100)) : 0;
-
-      return {
-        ...g,
-        targetTime12: calc ? calc.timeOut12 : '--:--',
-        targetTime24: calc ? calc.timeOut24 : '--:--',
-        remainingMinutes: remaining,
-        isReached: workedCalc.roundedHours >= g.hours,
-        progressPercent: Math.round(progress),
-      };
-    });
-  }, [timeIn, breakMinutes, customTarget, isUsingCurrentTime, currentTimeStr, timeOut, workedCalc.roundedHours]);
+    return {
+      hours,
+      targetTime12: calc.timeOut12,
+      remainingMinutes: Math.max(0, calc.totalTargetMinutesFromMidnight - endMinutes),
+      isReached: workedCalc.rawHours >= hours,
+      progressPercent: Math.round(Math.min(100, Math.max(0, (workedCalc.rawHours / hours) * 100))),
+    };
+  }, [timeIn, breakMinutes, targetHoursInput, effectiveTimeOut, workedCalc.rawHours]);
 
   const handleSetTimeInNow = () => {
     setTimeIn(getCurrentTimeString());
@@ -131,9 +119,6 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
       <div className="view-header">
         <div>
           <h2>Daily Calculator & Projections</h2>
-          <p className="view-description">
-            Interface 1: Ephemeral shift calculation, target completion forecasting, and single-click daily logging.
-          </p>
         </div>
         <div className="current-clock-pill">
           <Clock size={16} />
@@ -145,11 +130,8 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
         {/* Left Column: Form Controls */}
         <section className="calculator-card form-section" aria-labelledby="controls-heading">
           <h3 id="controls-heading" className="card-title">
-            Shift Parameters (Ephemeral)
+            Shift Details
           </h3>
-          <p className="card-subtitle">
-            Values are maintained in-memory. Only final rounded hours are committed upon logging.
-          </p>
 
           <form onSubmit={handleLogSubmit} className="calculator-form">
             {/* Date Input */}
@@ -184,7 +166,6 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                   <Clock size={16} />
                   <span>Time In</span>
                 </label>
-                <span className="label-help">24-hour format</span>
               </div>
               <div className="input-with-actions">
                 <input
@@ -221,9 +202,6 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                   <Clock size={16} />
                   <span>Time Out (Optional)</span>
                 </label>
-                <span className="label-help">
-                  {isUsingCurrentTime ? 'Auto-calculating using current time' : 'Fixed end time'}
-                </span>
               </div>
               <div className="input-with-actions">
                 <input
@@ -345,7 +323,6 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
           <div className="calculator-card status-card">
             <div className="status-header">
               <span className="status-label">Live Calculation Status</span>
-              <span className="precision-pill">ROUND to 0.1 hr</span>
             </div>
 
             <div className="status-main">
@@ -359,8 +336,6 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                     <Sparkles size={16} className="inline-icon" />
                     <strong>If you leave now:</strong> you will log{' '}
                     <span className="highlight-val">{workedCalc.roundedHours.toFixed(1)} hrs</span>
-                    <br />
-                    <small>(Raw: {workedCalc.rawHours.toFixed(3)} hrs, Break: {breakMinutes}m)</small>
                   </p>
                 ) : (
                   <p className="fixed-shift-text">
@@ -372,88 +347,78 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
             </div>
           </div>
 
-          {/* Target Cards */}
+          {/* Editable shift target */}
           <div className="targets-container">
-            <div className="targets-header">
-              <h3 id="projections-heading" className="card-title">
-                Shift Target Projections
-              </h3>
-              <div className="custom-target-control">
-                <label htmlFor="custom-target-input">Custom Target:</label>
-                <input
-                  id="custom-target-input"
-                  type="number"
-                  step="0.1"
-                  min="0.5"
-                  max="24"
-                  value={customTarget}
-                  onChange={(e) => setCustomTarget(parseFloat(e.target.value) || 8.0)}
-                  className="target-num-input"
-                />
-                <span>hrs</span>
+            <h3 id="projections-heading" className="card-title">
+              Shift Target
+            </h3>
+            <div className={`target-card ${target?.isReached ? 'target-reached' : ''}`}>
+              <div className="target-card-top">
+                <div className="custom-target-control">
+                  <label htmlFor="target-hours-input">Target hours:</label>
+                  <input
+                    id="target-hours-input"
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    max="24"
+                    value={targetHoursInput}
+                    onChange={(e) => setTargetHoursInput(e.target.value)}
+                    className="target-num-input"
+                    aria-describedby={!target ? 'target-hours-hint' : undefined}
+                    aria-invalid={targetHoursInput !== '' && !target}
+                  />
+                  <span>hrs</span>
+                </div>
+                {target && (
+                  target.isReached ? (
+                    <span className="badge badge-success">Target Reached</span>
+                  ) : (
+                    <span className="badge badge-pending">
+                      {formatDurationMinutes(target.remainingMinutes)} remaining
+                    </span>
+                  )
+                )}
               </div>
-            </div>
 
-            <div className="target-cards-grid">
-              {targets.map((target, idx) => (
-                <div
-                  key={idx}
-                  className={`target-card ${target.isReached ? 'target-reached' : ''}`}
-                >
-                  <div className="target-card-top">
-                    <span className="target-label">{target.label}</span>
-                    {target.isReached ? (
-                      <span className="badge badge-success">Target Reached</span>
-                    ) : (
-                      <span className="badge badge-pending">
-                        {formatDurationMinutes(target.remainingMinutes)} remaining
-                      </span>
-                    )}
-                  </div>
-
+              {target ? (
+                <>
                   <div className="target-time-display">
                     <span className="target-time-label">Target Time Out:</span>
                     <span className="target-time-val">{target.targetTime12}</span>
                   </div>
-
-                  <div className="progress-bar-container" aria-hidden="true">
-                    <div
-                      className="progress-bar-fill"
-                      style={{ width: `${target.progressPercent}%` }}
-                    />
-                  </div>
-                  <div className="progress-meta">
-                    <span>{target.progressPercent}% completed</span>
-                    <span>Goal: {target.hours.toFixed(1)} hrs</span>
-                  </div>
-                </div>
-              ))}
+                  {showProgress && (
+                    <>
+                      <div className="progress-bar-container" aria-hidden="true">
+                        <div
+                          className="progress-bar-fill"
+                          style={{ width: `${target.progressPercent}%` }}
+                        />
+                      </div>
+                      <div className="progress-meta">
+                        <span>{target.progressPercent}% completed</span>
+                        <span>Goal: {target.hours.toFixed(1)} hrs</span>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <p id="target-hours-hint" className="card-subtitle">
+                  Enter target hours from 0.1 to 24 and a valid time in to see your departure time.
+                </p>
+              )}
             </div>
-          </div>
-
-          {/* Quick Explanation Card */}
-          <div className="calculator-card info-card">
-            <div className="info-header">
-              <HelpCircle size={16} />
-              <h4>How Projections Work (Design Section 6.1)</h4>
-            </div>
-            <ul className="info-list">
-              <li>
-                <strong>Raw Duration:</strong> <code>(Time Out - Time In - Break Minutes) / 60</code>
-              </li>
-              <li>
-                <strong>Tenth-Hour Rounding:</strong> <code>ROUND(Raw Hours * 10) / 10</code>
-              </li>
-              <li>
-                <strong>Estimated Time Out:</strong> <code>Time In + Target Hours + Break Minutes</code>
-              </li>
-              <li>
-                <strong>Repeated Logs:</strong> Logging multiple times throughout the day safely updates the total hours for that day.
-              </li>
-            </ul>
           </div>
         </section>
       </div>
+      <label className="checkbox-label">
+        <input
+          type="checkbox"
+          checked={showProgress}
+          onChange={(e) => setShowProgress(e.target.checked)}
+        />
+        <span>Show progress bars</span>
+      </label>
     </div>
   );
 };
