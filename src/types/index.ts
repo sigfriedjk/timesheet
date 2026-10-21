@@ -47,3 +47,28 @@ export interface TargetCalculation {
   isReached: boolean;
   progressPercent: number;
 }
+
+export type LeaveCategory = 'pto' | 'holiday' | 'birthday' | 'overhead' | 'adjustment';
+export interface LeaveEntry {
+  id: string;
+  date: string;
+  category: LeaveCategory;
+  hours: number;
+  notes?: string;
+}
+
+export interface LeaveSettings {
+  openingMonth: string;
+  openingPto: number;
+  openingHoliday: number;
+  openingBirthday: number;
+  birthdayMonth: number;
+  workPercent: number;
+  autoPto: boolean;
+}
+
+export interface MonthlyReportState {
+  settings: LeaveSettings;
+  entries: LeaveEntry[];
+  projectedWork: Record<string, number>;
+}

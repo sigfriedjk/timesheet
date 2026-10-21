@@ -281,3 +281,13 @@ Represents manual overrides or adjustments to the running leave balance for a gi
    $$
    P_{\text{POP}} = \left( \frac{H_{\text{POP}}}{\text{POP.targetHours}} \right) \times 100\%
    $$
+
+## Implemented Monthly Report Refinements
+
+The monthly report follows the grouped work/accrued/entered/balance structure of the supplied leave worksheet. Its weekday-hours baseline includes holidays (`8 × Monday–Friday count`), with holiday credits and usage tracked separately. This differs from the calendar/sample 94% target baseline, which excludes observed holidays.
+
+A selected actuals cutoff separates actual logs/leave from future plans. The default future work rate is 94.3% of eight-hour non-holiday weekdays; dated future daily logs replace individual day estimates, and monthly total-work overrides replace automatic forecasts. Planned leave reduces unlogged future work estimates. Projected PTO usage fills future weekday gaps after other leave.
+
+Opening balances are configured at the start of a chosen month and carried across years. Historical PTO gaps are not inferred unless the optional Settings policy is enabled. Signed PTO adjustments and separate PTO/holiday/birthday/overhead entries are dated so future entries do not alter current balances. All report settings, entries, and forecasts are isolated between personal and sample stores. A sample reset resets only the sample report.
+
+Rolling totals span trailing 12-month windows across years, rather than restarting in January. Partial history is labeled and is not silently padded with zero months before tracking started; empty months inside the tracked range count as zero. Annual totals sum flows, while December balances are closing values and are not summed.

@@ -8,6 +8,8 @@ import {
   initializeSampleLogs,
   getActiveLogDataset,
   setActiveLogDataset,
+  getMonthlyReportState,
+  saveMonthlyReportState,
 } from './storage';
 
 describe('Storage Service (Local-First Persistence & Overwrite Logic)', () => {
@@ -91,5 +93,24 @@ describe('Isolated sample workspace', () => {
     expect(getActiveLogDataset()).toBe('sample2026');
     setActiveLogDataset('personal');
     expect(getActiveLogDataset()).toBe('personal');
+  });
+});
+
+describe('Monthly report persistence', () => {
+  beforeEach(clearStorageForTesting);
+  it('persists opening balances, leave entries, and monthly forecasts separately for personal and sample workspaces', () => {
+    const personal = getMonthlyReportState();
+    personal.settings.openingPto = 91.23;
+    personal.entries.push({ id: 'personal-leave', date: '2026-03-03', category: 'pto', hours: 8 });
+    personal.projectedWork['2026-11'] = 144;
+    saveMonthlyReportState(personal);
+    const sampleState = getMonthlyReportState('sample2026');
+    sampleState.settings.openingPto = 20;
+    saveMonthlyReportState(sampleState, 'sample2026');
+    expect(getMonthlyReportState()).toEqual(personal);
+    expect(getMonthlyReportState('sample2026').settings.openingPto).toBe(20);
+    initializeSampleLogs(true);
+    expect(getMonthlyReportState('sample2026').settings.openingPto).toBe(0);
+    expect(getMonthlyReportState()).toEqual(personal);
   });
 });

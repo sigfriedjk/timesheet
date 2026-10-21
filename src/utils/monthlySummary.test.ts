@@ -1,0 +1,117 @@
+import { describe, expect, it } from 'vitest';
+import { TimeLog } from '../types';
+import { createSampleTimeLogs2026 } from '../services/sampleData';
+import { buildMonthlySummary, createDefaultMonthlyReport } from './monthlySummary';
+
+const log = (date: string, totalHours: number): TimeLog => ({ id: date, date, totalHours, createdAt: `${date}T18:00:00Z`, updatedAt: `${date}T18:00:00Z` });
+const sample = createSampleTimeLogs2026();
+
+describe('Monthly work and leave summary', () => {
+  it('matches the sheet weekday/credit/PTO formulas without double counting holidays', () => {
+    const state = createDefaultMonthlyReport(2026);
+    const jan = buildMonthlySummary(sample, state, 2026, '2026-10-20').rows[0];
+    expect(jan).toMatchObject({ weekdayHours: 176, holidayCount: 2, actualHours: 150.3, workHours: 150.3,
+      leaveNeeded: 25.7, accruedPto: 12.79, accruedHoliday: 16, accruedBirthday: 8, usedPto: 0, usedHoliday: 8 });
+    expect(jan.balance).toEqual({ pto: 12.79, holiday: 8, birthday: 8, total: 28.79 });
+    expect(buildMonthlySummary(sample, state, 2026, '2026-10-20').rows[6].holidayCount).toBe(1);
+  });
+
+  it('keeps recorded work and current leave separate from future projections and does not mutate logs', () => {
+    const state = createDefaultMonthlyReport(2026);
+    const before = JSON.stringify(sample);
+    const report = buildMonthlySummary(sample, state, 2026, '2026-10-20');
+    expect(report.totals.actualHours).toBe(1210.7);
+    expect(report.totals.workHours).toBe(1580.4);
+    expect(report.rows[9]).toMatchObject({ projected: true, actualHours: 97.8, workHours: 158.2, remainingHours: 60.4 });
+    expect(report.rows[10]).toMatchObject({ actualHours: 0, workHours: 143.3, accruedPto: 12.19, usedPto: 8.7 });
+    expect(JSON.stringify(sample)).toBe(before);
+    state.projectedWork['2026-11'] = 0;
+    const changed = buildMonthlySummary(sample, state, 2026, '2026-10-20');
+    expect(changed.rows[10]).toMatchObject({ workHours: 0, accruedPto: 0, usedPto: 152 });
+    expect(changed.currentBalance).toEqual(report.currentBalance);
+    expect(changed.yearEndBalance!.total).toBeLessThan(report.yearEndBalance!.total);
+  });
+
+  it('allows automatic historical PTO gaps, including empty months, with explicit entries overriding them', () => {
+    const state = createDefaultMonthlyReport(2026);
+    state.settings.autoPto = true;
+    let report = buildMonthlySummary(sample, state, 2026, '2026-10-20');
+    expect(report.rows[0].usedPto).toBe(17.7);
+    expect(report.rows[1]).toMatchObject({ actualHours: 0, usedPto: 152 });
+    state.entries.push({ id: 'override', date: '2026-01-31', category: 'pto', hours: 0 });
+    report = buildMonthlySummary(sample, state, 2026, '2026-10-20');
+    expect(report.rows[0].usedPto).toBe(0);
+  });
+
+  it('accounts for dated usage and signed PTO adjustments while retaining separate balances', () => {
+    const state = createDefaultMonthlyReport(2026);
+    state.entries = [
+      { id: 'pto', date: '2026-01-09', category: 'pto', hours: 20 },
+      { id: 'adj', date: '2026-01-31', category: 'adjustment', hours: -0.02 },
+      { id: 'holiday', date: '2026-01-31', category: 'holiday', hours: 0 },
+      { id: 'birthday', date: '2026-01-23', category: 'birthday', hours: 2 },
+    ];
+    const jan = buildMonthlySummary(sample, state, 2026, '2026-10-20').rows[0];
+    expect(jan.balance).toEqual({ pto: -7.23, holiday: 16, birthday: 6, total: 14.77 });
+  });
+
+  it('replaces daily forecasts with future-dated logs and deducts planned leave without changing current balances', () => {
+    const state = createDefaultMonthlyReport(2026);
+    const baseline = buildMonthlySummary(sample, state, 2026, '2026-10-20');
+    const withPlan = buildMonthlySummary([...sample, log('2026-10-21', 10)], state, 2026, '2026-10-20');
+    expect(withPlan.totals.actualHours).toBe(baseline.totals.actualHours);
+    expect(withPlan.rows[9].workHours).toBe(160.6);
+    expect(withPlan.currentBalance).toEqual(baseline.currentBalance);
+    state.entries.push({ id: 'vacation', date: '2026-11-02', category: 'pto', hours: 8 });
+    const vacation = buildMonthlySummary(sample, state, 2026, '2026-10-20');
+    expect(vacation.rows[10].workHours).toBe(135.8);
+    expect(vacation.rows[10].usedPto).toBe(16.2);
+    expect(vacation.currentBalance).toEqual(baseline.currentBalance);
+  });
+
+  it('honors monthly forecast overrides including zero and never replaces historical actuals', () => {
+    const state = createDefaultMonthlyReport(2026);
+    state.projectedWork = { '2026-01': 0, '2026-10': 50, '2026-11': 144 };
+    const report = buildMonthlySummary(sample, state, 2026, '2026-10-20');
+    expect(report.rows[0].workHours).toBe(150.3);
+    expect(report.rows[9].workHours).toBe(97.8);
+    expect(report.rows[10]).toMatchObject({ workHours: 144, usedPto: 8, accruedPto: 12.25 });
+  });
+
+  it('carries balances across year boundaries and only credits the configured birthday month', () => {
+    const state = createDefaultMonthlyReport(2025);
+    state.settings = { ...state.settings, openingMonth: '2025-12', openingPto: 100, openingHoliday: 10, openingBirthday: 5 };
+    const report = buildMonthlySummary([log('2025-12-01', 8), log('2026-01-02', 8)], state, 2026, '2026-01-31');
+    expect(report.currentBalance).toEqual({ pto: 101.36, holiday: 10, birthday: 13, total: 124.36 });
+    state.settings.birthdayMonth = 5;
+    const mayBirthday = buildMonthlySummary([], state, 2026, '2026-05-01');
+    expect(mayBirthday.rows[0].accruedBirthday).toBe(0);
+    expect(mayBirthday.rows[4].accruedBirthday).toBe(8);
+    expect(mayBirthday.currentBalance!.birthday).toBe(13);
+  });
+
+  it('uses true trailing windows across years and includes empty tracked months instead of dropping them', () => {
+    const state = createDefaultMonthlyReport(2025);
+    const logs = Array.from({ length: 24 }, (_, index) => log(`${2025 + Math.floor(index / 12)}-${String(index % 12 + 1).padStart(2, '0')}-02`, 8));
+    const dec = buildMonthlySummary(logs, state, 2026, '2026-12-31').rows[11];
+    expect(dec).toMatchObject({ rollingMonths: 12, rollingTotal: 96, rollingAverage: 8 });
+    const noFebruary = logs.filter(entry => !entry.date.startsWith('2026-02'));
+    const emptyMonth = buildMonthlySummary(noFebruary, state, 2026, '2026-12-31').rows[11];
+    expect(emptyMonth).toMatchObject({ rollingMonths: 12, rollingTotal: 88, rollingAverage: 7.3 });
+    const partial = buildMonthlySummary(sample, createDefaultMonthlyReport(2026), 2026, '2026-10-20');
+    expect(partial.rows[0]).toMatchObject({ rollingMonths: 1, rollingAverage: 150.3 });
+    expect(partial.rolling).toMatchObject({ months: 9, total: 1112.9, average: 123.7 });
+    expect(partial.rows[11].rollingMonths).toBe(12);
+  });
+
+  it('returns unknown balances before the configured opening month and adds credits only once', () => {
+    const state = createDefaultMonthlyReport(2026);
+    state.settings.openingMonth = '2027-01';
+    expect(buildMonthlySummary(sample, state, 2026, '2026-10-20').yearEndBalance).toBeNull();
+    const regular = buildMonthlySummary([], createDefaultMonthlyReport(2026), 2026, '2026-12-31');
+    expect(regular.totals.accruedHoliday).toBe(88);
+    expect(regular.totals.accruedBirthday).toBe(8);
+    expect(regular.currentBalance).toEqual({ pto: 0, holiday: 0, birthday: 8, total: 8 });
+    expect(regular.yearEndBalance).toEqual(regular.rows[11].balance);
+  });
+});

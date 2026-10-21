@@ -12,7 +12,7 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
 
 ---
 
-## 🚀 Key Features Implemented (Phase 1: Hello World & Daily Calculator)
+## Implemented Features
 
 1. **Daily Calculator & Shift Projections (Interface 1):**
    * **Ephemeral Inputs:** In-memory calculation for `Date`, `Time In`, `Time Out` (optional), and `Break Duration (mins)`.
@@ -36,7 +36,14 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
    * Click a date to add or edit total hours and notes; delete entries from the history table.
    * Isolated 2026 sample workspace with 149 entries, CSV/JSON downloads, reset, and a switch back to personal logs.
 
-3. **Domain Types & Architectural Scaffolding:**
+3. **Monthly Work & Leave Summary:**
+   * A 12-row year table with actual work, remaining work forecasts, trailing 12-month totals/averages, accrued leave, used/planned leave, and separate PTO/holiday/birthday balances.
+   * An explicit actuals cutoff keeps future logs and projected work separate from recorded hours. Monthly work overrides and dated planned leave recalculate forecasts without changing daily logs.
+   * **Settings → Leave & forecasts** configures opening balances/month, future work rate (94.3% by default), birthday month, and optional historical PTO gap-filling. Historical PTO defaults to explicit entries; forecasts estimate PTO for remaining weekday shortfalls.
+   * Work-hour and leave precision remain 0.1 and 0.01 hours respectively. Weekday hours in this table include holidays; holiday credits are tracked separately, following the reference workbook's structure.
+   * Up to 12 tracked months are used for rolling averages, including empty tracked months as zero. Partial windows are labeled; the top rolling average uses completed months.
+
+4. **Domain Types & Architectural Scaffolding:**
    * Fully typed domain entities (`TimeLog`, `PeriodOfPerformance`, `LeaveAdjustment`).
    * Local-first persistence repository ready for Supabase client synchronization.
    * Navigation tabs for all 5 core application interfaces.
@@ -49,7 +56,7 @@ Open [the sample calendar](https://sigfriedjk.github.io/timesheet/?sample=2026) 
 
 The deterministic sample covers January 1 through October 20, 2026 with 149 logged days and 1,210.7 hours. February and August are empty; July 13–17 is a week off. It includes scattered days off, worked and unworked holidays, a Saturday shift, and daily hours from 6.0 to 10.0. Populated full months test just-below, exact, and just-above rounded 94% targets; October is partial. Unlogged dates indicate absent entries, not explicit leave records.
 
-In Settings, expand **2026 sample data coverage & downloads** to download the original sample as CSV or JSON. Monthly and POP summary screens remain scaffolds for future implementation.
+In Settings, expand **2026 sample data coverage & downloads** to download the original sample as CSV or JSON. The monthly summary uses these same logs. POP summaries remain a scaffold for future implementation.
 
 ---
 
@@ -124,3 +131,13 @@ Outputs static production assets to `./dist/`, ready for direct deployment to Gi
 * **Leave Accrual Function:**
   $$\text{ROUND}_{0.01}(x) = \frac{\text{ROUND}(x \times 100)}{100}$$
   $$A_{\text{worked}} = \text{ROUND}_{0.01}(0.0851 \times H_{\text{month}})$$
+
+## Monthly Summary Workflow
+
+Open the Monthly Summary tab or use `?view=monthly` (`?sample=2026&view=monthly` for the sample workspace). Set **Actuals through** to the date through which logs and leave usage are considered actual. The sample defaults to October 20, 2026.
+
+Opening balances default to zero at January of the current year (January 2026 for the sample). Enter the correct starting PTO, holiday, and birthday balances in Settings. Balances carry across years; the report shows unavailable balances before the configured opening month.
+
+Click a month to add dated PTO, holiday, birthday, overhead, or signed PTO adjustment entries. Future dates are planned leave. The month editor also allows a total-work-hours forecast override for incomplete/future months; a zero override is supported, and completed months always use recorded work. Resetting sample data also resets only the sample report settings/leave entries/forecasts.
+
+US federal credits are counted on observed weekdays to avoid double credit for actual and observed dates. Unworked observed holidays default to holiday usage; explicit holiday entries override that month's actual/planned portion. PTO earns 0.0851 hours per worked hour, holiday credits are granted at the start of their month, and birthday credit is 8 hours at the start of the configured month. Manual PTO entries override optional automatic historical PTO gaps. Forecast PTO covers future weekday shortfalls after other leave; balances can be negative.

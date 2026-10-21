@@ -1,4 +1,5 @@
-import { TimeLog } from '../types';
+import { TimeLog, MonthlyReportState } from '../types';
+import { createDefaultMonthlyReport } from '../utils/monthlySummary';
 import { roundToTenth } from '../utils/calculations';
 import { createSampleTimeLogs2026 } from './sampleData';
 
@@ -149,8 +150,24 @@ export function setActiveLogDataset(dataset: LogDataset): void {
 
 /** The sample has its own store; reset never changes personal entries. */
 export function initializeSampleLogs(reset = false): TimeLog[] {
+  if (reset) saveMonthlyReportState(createDefaultMonthlyReport(2026), 'sample2026');
   if (reset || getItem(STORAGE_KEYS.SAMPLE_LOGS) === null) {
     setItem(STORAGE_KEYS.SAMPLE_LOGS, JSON.stringify(createSampleTimeLogs2026()));
   }
   return getAllTimeLogs('sample2026');
+}
+
+export function getMonthlyReportState(dataset: LogDataset = 'personal'): MonthlyReportState {
+  const fallback = createDefaultMonthlyReport(dataset === 'sample2026' ? 2026 : new Date().getFullYear());
+  try {
+    const stored = getItem(`work_hours_tracker_${dataset}_monthly_report`);
+    if (!stored) return fallback;
+    const parsed = JSON.parse(stored) as MonthlyReportState;
+    if (!parsed || !Array.isArray(parsed.entries)) return fallback;
+    return { settings: { ...fallback.settings, ...parsed.settings }, entries: parsed.entries, projectedWork: parsed.projectedWork ?? {} };
+  } catch { return fallback; }
+}
+
+export function saveMonthlyReportState(state: MonthlyReportState, dataset: LogDataset = 'personal'): void {
+  setItem(`work_hours_tracker_${dataset}_monthly_report`, JSON.stringify(state));
 }

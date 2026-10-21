@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ViewTab, TimeLog } from './types';
-import { getAllTimeLogs, saveTimeLog, deleteTimeLog, getActiveLogDataset, setActiveLogDataset, initializeSampleLogs, LogDataset } from './services/storage';
+import { ViewTab, TimeLog, MonthlyReportState } from './types';
+import { getAllTimeLogs, saveTimeLog, deleteTimeLog, getActiveLogDataset, setActiveLogDataset, initializeSampleLogs, LogDataset, getMonthlyReportState, saveMonthlyReportState } from './services/storage';
 import { Navigation } from './components/Navigation';
 import { DailyCalculator } from './components/DailyCalculator';
 import { CalendarView } from './components/CalendarView';
 import { SettingsView } from './components/SettingsView';
-import { MonthlySummaryView, PopSummaryView } from './components/OtherViews';
+import { PopSummaryView } from './components/OtherViews';
+import { MonthlySummaryView } from './components/MonthlySummaryView';
 import { CheckCircle2, X } from 'lucide-react';
 
 interface ToastMessage {
@@ -20,13 +21,24 @@ export const App: React.FC = () => {
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('sample') === '2026'
       ? 'sample2026' : getActiveLogDataset()
   );
-  const [currentTab, setCurrentTab] = useState<ViewTab>(dataset === 'sample2026' ? 'calendar' : 'calculator');
+  const [reportState, setReportState] = useState<MonthlyReportState>(() => getMonthlyReportState(dataset));
+  const [currentTab, setCurrentTab] = useState<ViewTab>(() => {
+    const view = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('view') : null;
+    return view && ['calculator', 'calendar', 'monthly', 'pop', 'settings'].includes(view)
+      ? view as ViewTab : dataset === 'sample2026' ? 'calendar' : 'calculator';
+  });
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
   useEffect(() => {
     setLogs(dataset === 'sample2026' ? initializeSampleLogs() : getAllTimeLogs());
     setActiveLogDataset(dataset);
+    setReportState(getMonthlyReportState(dataset));
   }, [dataset]);
+
+  const updateReportState = (state: MonthlyReportState) => {
+    saveMonthlyReportState(state, dataset);
+    setReportState(state);
+  };
 
   const showToast = (text: string, type: 'success' | 'info' | 'warning' = 'success') => {
     setToast({ id: Date.now().toString(), type, text });
@@ -122,23 +134,25 @@ export const App: React.FC = () => {
             />
           )}
 
-          {currentTab === 'monthly' && <MonthlySummaryView />}
+          {currentTab === 'monthly' && <MonthlySummaryView key={dataset} logs={logs} state={reportState} isSample={dataset === 'sample2026'} onChange={updateReportState} onOpenSettings={() => setCurrentTab('settings')} />}
 
           {currentTab === 'pop' && <PopSummaryView />}
 
           {currentTab === 'settings' && (
             <SettingsView
               isSample={dataset === 'sample2026'}
+              leaveSettings={reportState.settings}
+              onSaveLeaveSettings={settings => updateReportState({ ...reportState, settings })}
               onUseSample={() => setDataset('sample2026')}
               onUsePersonal={usePersonalData}
-              onResetSample={() => { const restored = initializeSampleLogs(true); setLogs(restored); return restored.length; }}
+              onResetSample={() => { const restored = initializeSampleLogs(true); setLogs(restored); setReportState(getMonthlyReportState(dataset)); return restored.length; }}
             />
           )}
         </div>
       </main>
 
       {/* Footer */}
-      {currentTab !== 'calendar' && <footer className="app-footer">
+      {currentTab !== 'calendar' && currentTab !== 'monthly' && <footer className="app-footer">
         <div className="footer-container">
           <span>Work Hours Tracker &bull; Node.js + Vite + TypeScript &bull; GitHub Pages Static Architecture</span>
           <span className="footer-spec">Conforms to Design Document v1.0 (0.1hr Work / 0.01hr Leave Precision)</span>

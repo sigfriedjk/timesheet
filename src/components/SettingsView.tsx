@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { Download } from 'lucide-react';
+import { LeaveSettings } from '../types';
+import { LeavePolicyForm } from './LeavePolicyForm';
 import { MONTH_NAMES } from '../utils/calendar';
 import { SAMPLE_MONTH_NOTES, createSampleTimeLogs2026, sampleDataCsv } from '../services/sampleData';
 
 interface SettingsViewProps {
   isSample: boolean;
+  leaveSettings: LeaveSettings;
+  onSaveLeaveSettings: (settings: LeaveSettings) => void;
   onUseSample: () => void;
   onUsePersonal: () => void;
   onResetSample: () => number;
@@ -21,11 +25,12 @@ function downloadFile(name: string, data: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ isSample, onUseSample, onUsePersonal, onResetSample }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ isSample, leaveSettings, onSaveLeaveSettings, onUseSample, onUsePersonal, onResetSample }) => {
   const [status, setStatus] = useState('');
   return (
     <div className="settings-view">
       <div className="view-header"><h2>Settings</h2></div>
+      <LeavePolicyForm key={isSample ? 'sample' : 'personal'} settings={leaveSettings} onSave={onSaveLeaveSettings} />
       <section className="calculator-card sample-settings" aria-labelledby="sample-settings-title">
         <h3 id="sample-settings-title" className="card-title">Data source</h3>
         <fieldset className="dataset-selector">

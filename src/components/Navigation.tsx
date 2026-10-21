@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ViewTab } from '../types';
 import { Clock, Calendar, BarChart3, Layers, Settings } from 'lucide-react';
 
@@ -13,6 +13,9 @@ export const Navigation: React.FC<NavigationProps> = ({
   onSelectTab,
   loggedCount,
 }) => {
+  const activeTabRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { activeTabRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [currentTab]);
+
   const navItems: { id: ViewTab; label: string; icon: React.ReactNode; badge?: string | number }[] = [
     {
       id: 'calculator',
@@ -60,6 +63,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             return (
               <button
                 key={item.id}
+                ref={isActive ? activeTabRef : undefined}
                 onClick={() => onSelectTab(item.id)}
                 className={`nav-tab-btn ${isActive ? 'active' : ''}`}
                 type="button"

@@ -90,17 +90,18 @@ try {
   await send('Network.enable', {}, sessionId);
   const evaluate = async expression => {
     const result = await send('Runtime.evaluate', { expression, returnByValue: true }, sessionId);
-    if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
+    if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
     return result.result.value;
   };
   for (const [name, url, selector] of [
     ['normal', site.href, '.calculator-view'],
     ['sample', new URL('?sample=2026', site).href, '.year-calendar'],
+    ['monthly', new URL('?sample=2026&view=monthly', site).href, '.monthly-view'],
   ]) {
     await send('Page.navigate', { url }, sessionId);
     let ready = false;
     for (let i = 0; i < 200; i++) {
-      ready = await evaluate(`!!document.querySelector(${JSON.stringify(selector)})`);
+      ready = await evaluate(name === 'monthly' ? `document.querySelector('[data-stat=year-hours]')?.textContent === '1210.7'` : name === 'sample' ? `document.querySelectorAll('.calendar-logged').length === 149` : `!!document.querySelector(${JSON.stringify(selector)})`);
       if (ready) break;
       await delay(200);
     }
@@ -115,6 +116,10 @@ try {
       const cleanCalendar = await evaluate(`!document.querySelector('.sample-banner, .sample-coverage, .month-totals, .month-target, .month-holidays, .calendar-view h2, .app-footer') && !document.querySelector('.year-calendar').innerText.toLowerCase().includes('sample')`);
       if (!cleanCalendar) throw new Error('Calendar contains removed sample controls, title, or month-card details');
       report.pages.push({ name, url, rendered: true, ...counts });
+    } else if (name === 'monthly') {
+      const summary = await evaluate(`({ rows: document.querySelectorAll('.monthly-table tbody tr').length, actual: Number(document.querySelector('[data-stat=year-hours]').textContent), forecast: Number(document.querySelector('.monthly-table tfoot tr').children[4].textContent), currentLeave: parseFloat(document.querySelector('[data-stat=current-leave]').textContent), projectedLeave: parseFloat(document.querySelector('[data-stat=year-end-leave]').textContent) })`);
+      if (summary.rows !== 12 || summary.actual !== 1210.7 || !(summary.forecast > summary.actual) || !Number.isFinite(summary.currentLeave) || !Number.isFinite(summary.projectedLeave)) throw new Error(`Monthly report failed: ${JSON.stringify(summary)}`);
+      report.pages.push({ name, url, rendered: true, ...summary });
     } else report.pages.push({ name, url, rendered: true });
     console.log(`Chrome verified ${name} page: ${url}`);
   }
@@ -131,7 +136,7 @@ try {
   console.log('Chrome verified Settings sample controls and data-source switching.');
   if (exceptions.length) throw new Error(`Browser errors: ${exceptions.join('; ')}`);
   report.success = true;
-  console.log('Production HTTP, JavaScript/CSS, normal page, and 2026 sample calendar checks passed.');
+  console.log('Production HTTP, JavaScript/CSS, calculator, calendar, monthly report, and Settings checks passed.');
 } catch (error) {
   report.success = false;
   report.error = error.message;

@@ -1,40 +1,4 @@
-import { BarChart3, Layers } from 'lucide-react';
-
-export const MonthlySummaryView: React.FC = () => {
-  return (
-    <div className="placeholder-view">
-      <div className="view-header">
-        <div>
-          <h2>Monthly Summary & Leave Tracking</h2>
-        </div>
-      </div>
-
-      <div className="calculator-card">
-        <div className="feature-preview-box">
-          <BarChart3 size={40} className="feature-icon" />
-          <h3>Interface 3 Foundation Ready</h3>
-          <p>
-            This module will calculate formulaic monthly aggregations based on saved <code>TimeLog</code> records:
-          </p>
-          <ul className="formula-preview-list">
-            <li>
-              <strong>Total Worked Hours:</strong> <code>H_month = ROUND_0.1(SUM(totalHours))</code>
-            </li>
-            <li>
-              <strong>Accrued Worked Leave:</strong> <code>A_worked = ROUND_0.01(0.0851 * H_month)</code>
-            </li>
-            <li>
-              <strong>Holiday & Birthday Accrual:</strong> 8.0 hrs per federal holiday + 8.0 hrs on Jan 1st.
-            </li>
-            <li>
-              <strong>Net Ending Leave Balance:</strong> Running monthly balance to nearest 0.01 hour.
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  );
-};
+import { Layers } from 'lucide-react';
 
 export const PopSummaryView: React.FC = () => {
   return (
