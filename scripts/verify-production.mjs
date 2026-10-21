@@ -112,10 +112,23 @@ try {
     if (name === 'sample') {
       const counts = await evaluate('({ months: document.querySelectorAll(".month-calendar").length, dates: document.querySelectorAll(".calendar-day").length, entries: document.querySelectorAll(".calendar-logged").length })');
       if (counts.months !== 12 || counts.dates !== 365 || counts.entries !== 149) throw new Error(`Sample page counts are wrong: ${JSON.stringify(counts)}`);
+      const cleanCalendar = await evaluate(`!document.querySelector('.sample-banner, .sample-coverage, .month-totals, .month-target, .month-holidays, .calendar-view h2, .app-footer') && !document.querySelector('.year-calendar').innerText.toLowerCase().includes('sample')`);
+      if (!cleanCalendar) throw new Error('Calendar contains removed sample controls, title, or month-card details');
       report.pages.push({ name, url, rendered: true, ...counts });
     } else report.pages.push({ name, url, rendered: true });
     console.log(`Chrome verified ${name} page: ${url}`);
   }
+  await evaluate(`Array.from(document.querySelectorAll('.nav-tab-btn')).find(button => button.textContent.trim() === 'Settings').click()`);
+  for (let i = 0; i < 50 && !await evaluate(`!!document.querySelector('.settings-view')`); i++) await delay(100);
+  if (!await evaluate(`!!document.querySelector('.settings-view input[value=sample2026]:checked') && !!document.querySelector('.settings-view .sample-coverage')`)) throw new Error('Settings is missing the active sample selection or coverage/downloads');
+  await evaluate(`document.querySelector('.dataset-selector input[value=personal]').click()`);
+  for (let i = 0; i < 50 && !await evaluate(`!!document.querySelector('.settings-view input[value=personal]:checked')`); i++) await delay(100);
+  if (!await evaluate(`!!document.querySelector('.settings-view input[value=personal]:checked') && !location.search.includes('sample')`)) throw new Error('Switching to personal data must stay in Settings and clear the sample query');
+  await evaluate(`document.querySelector('.dataset-selector input[value=sample2026]').click()`);
+  for (let i = 0; i < 50 && !await evaluate(`!!document.querySelector('.settings-view input[value=sample2026]:checked')`); i++) await delay(100);
+  if (!await evaluate(`!!document.querySelector('.settings-view input[value=sample2026]:checked')`)) throw new Error('Switching to sample data must stay in Settings');
+  report.settings = { sourceSelection: true, sampleControls: true, staysInSettings: true };
+  console.log('Chrome verified Settings sample controls and data-source switching.');
   if (exceptions.length) throw new Error(`Browser errors: ${exceptions.join('; ')}`);
   report.success = true;
   console.log('Production HTTP, JavaScript/CSS, normal page, and 2026 sample calendar checks passed.');

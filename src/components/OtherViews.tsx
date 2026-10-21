@@ -1,4 +1,4 @@
-import { BarChart3, Layers, Settings } from 'lucide-react';
+import { BarChart3, Layers } from 'lucide-react';
 
 export const MonthlySummaryView: React.FC = () => {
   return (
@@ -63,28 +63,6 @@ export const PopSummaryView: React.FC = () => {
               <strong>Completion %:</strong> <code>(Logged Hours / Target Hours) * 100%</code>
             </li>
           </ul>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export const SettingsView: React.FC = () => {
-  return (
-    <div className="placeholder-view">
-      <div className="view-header">
-        <div>
-          <h2>POP & System Settings</h2>
-        </div>
-      </div>
-
-      <div className="calculator-card">
-        <div className="feature-preview-box">
-          <Settings size={40} className="feature-icon" />
-          <h3>Interface 5 Foundation Ready</h3>
-          <p>
-            Allows configuring Periods of Performance and recording manual leave balance adjustments with reason codes.
-          </p>
         </div>
       </div>
     </div>

@@ -32,7 +32,7 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
 
 2. **12-Month Calendar & History View (Interface 2):**
    * Responsive January–December grid, including empty months, with weekend tinting and actual/observed US Federal Holidays calculated for the selected year.
-   * Monthly totals and comparisons to a rounded 94% target (8 hours per weekday, excluding observed federal holidays).
+   * Compact yearly counts and monthly hour totals, with streamlined month cards showing the month name, hours, and date grid.
    * Click a date to add or edit total hours and notes; delete entries from the history table.
    * Isolated 2026 sample workspace with 149 entries, CSV/JSON downloads, reset, and a switch back to personal logs.
 
@@ -45,11 +45,11 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
 
 ## 2026 Sample Data
 
-Open [the sample calendar](https://sigfriedjk.github.io/timesheet/?sample=2026) or select **Try 2026 sample data** in Calendar History. Sample entries use a separate browser storage key; editing, deleting, or resetting them does not change personal logs. The selected workspace persists across reloads. Select **Use my data** to return to personal logs.
+Open [the sample calendar](https://sigfriedjk.github.io/timesheet/?sample=2026) or select **2026 sample data** under **Settings → Data source**. Sample entries use a separate browser storage key; editing, deleting, or resetting them does not change personal logs. The selected workspace persists across reloads. Select **My data** in Settings to return to personal logs.
 
 The deterministic sample covers January 1 through October 20, 2026 with 149 logged days and 1,210.7 hours. February and August are empty; July 13–17 is a week off. It includes scattered days off, worked and unworked holidays, a Saturday shift, and daily hours from 6.0 to 10.0. Populated full months test just-below, exact, and just-above rounded 94% targets; October is partial. Unlogged dates indicate absent entries, not explicit leave records.
 
-Expand **2026 sample data coverage & downloads** to download the original sample as CSV or JSON. Monthly and POP summary screens remain scaffolds for future implementation.
+In Settings, expand **2026 sample data coverage & downloads** to download the original sample as CSV or JSON. Monthly and POP summary screens remain scaffolds for future implementation.
 
 ---
 

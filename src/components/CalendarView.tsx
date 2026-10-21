@@ -1,32 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { TimeLog } from '../types';
-import { Calendar as CalendarIcon, ArrowLeft, Trash2, Edit3, Plus, Download, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Trash2, Edit3, Plus, X } from 'lucide-react';
 import { MONTH_NAMES, WEEKDAY_NAMES, getFederalHolidays, getMonthCells, getMonthSummary } from '../utils/calendar';
 import { roundToTenth } from '../utils/calculations';
-import { SAMPLE_MONTH_NOTES, createSampleTimeLogs2026, sampleDataCsv } from '../services/sampleData';
 
 interface CalendarViewProps {
   logs: TimeLog[];
   isSample: boolean;
-  onLoadSample: () => void;
   onNavigateToCalculator: () => void;
   onDeleteLog: (date: string) => void;
   onSaveLog: (date: string, hours: number, notes: string) => void;
 }
 
-function downloadFile(name: string, data: string, type: string) {
-  const url = URL.createObjectURL(new Blob([data], { type }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = name;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 export const CalendarView: React.FC<CalendarViewProps> = ({
-  logs, isSample, onLoadSample, onNavigateToCalculator, onDeleteLog, onSaveLog,
+  logs, isSample, onNavigateToCalculator, onDeleteLog, onSaveLog,
 }) => {
   const [selectedYear, setSelectedYear] = useState(isSample ? 2026 : new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -37,25 +24,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   return (
     <div className="calendar-view">
-      <div className="view-header">
-        <h2>12-Month Calendar & History</h2>
-        <div className="header-actions">
-          {!isSample && <button type="button" className="btn-primary" onClick={onLoadSample}>Try 2026 sample data</button>}
-          <button type="button" onClick={onNavigateToCalculator} className="btn-secondary"><ArrowLeft size={16} />Open Calculator</button>
-        </div>
-      </div>
-
-      <details className="sample-coverage calculator-card">
-        <summary>2026 sample data coverage & downloads</summary>
-        <p>149 entries from January 1–October 20. February and August are empty; July includes a full week off. Holidays are both worked and taken off, with one Saturday shift. Each logged day has 6.0–10.0 hours.</p>
-        <p>Monthly baseline = 8 hours × weekdays, excluding observed US federal holidays. Full populated months sit near 94%; October is partial. Unlogged dates indicate no entry, not recorded leave.</p>
-        <div className="sample-actions">
-          <button type="button" className="btn-secondary" onClick={() => downloadFile('timesheet-sample-2026.csv', sampleDataCsv(), 'text/csv;charset=utf-8')}><Download size={16} />Download sample CSV</button>
-          <button type="button" className="btn-secondary" onClick={() => downloadFile('timesheet-sample-2026.json', JSON.stringify(createSampleTimeLogs2026(), null, 2), 'application/json')}><Download size={16} />Download sample JSON</button>
-        </div>
-        <ul className="sample-month-notes">{SAMPLE_MONTH_NOTES.slice(0, 10).map((note, i) => <li key={i}><strong>{MONTH_NAMES[i]}:</strong> {note}</li>)}</ul>
-      </details>
-
       <div className="calendar-kpi-strip">
         <div className="kpi-card">
           <span className="kpi-label">Year</span>
@@ -73,16 +41,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         <span><i className="legend-dot logged-dot" />Logged hours</span>
         <span><i className="legend-dot weekend-dot" />Weekend</span>
         <span><i className="legend-dot holiday-dot" />Federal holiday</span>
-        <span>Click a date to add or edit hours.</span>
       </div>
       <div className="year-calendar">
         {MONTH_NAMES.map((monthName, month) => {
           const summary = getMonthSummary(yearlyLogs, selectedYear, month);
-          const varianceText = summary.variance === 0 ? 'At 94% target' : `${Math.abs(summary.variance).toFixed(1)} h ${summary.variance < 0 ? 'below' : 'above'} 94% target`;
           return (
             <section key={month} className="month-calendar calculator-card" aria-label={`${monthName} ${selectedYear}`}>
               <div className="month-heading"><h3>{monthName}</h3><span>{summary.hours.toFixed(1)} h</span></div>
-              <div className="month-totals">{summary.days ? `${summary.days} logged days · ${summary.percent.toFixed(1)}% of ${summary.expectedHours.toFixed(1)} h` : 'No logged days'}</div>
               <div className="month-weekdays" aria-hidden="true">{WEEKDAY_NAMES.map((day) => <span key={day}>{day}</span>)}</div>
               <div className="month-days">
                 {getMonthCells(selectedYear, month).map((day, index) => {
@@ -99,11 +64,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   );
                 })}
               </div>
-              <div className={`month-target ${summary.variance >= 0 ? 'month-target-met' : ''}`}>
-                <span>94% target: {summary.targetHours.toFixed(1)} h</span>
-                <span>{varianceText}</span>
-              </div>
-              <ul className="month-holidays">{Object.entries(holidays).filter(([date]) => date.startsWith(`${selectedYear}-${String(month + 1).padStart(2, '0')}-`)).sort().map(([date, name]) => <li key={date}>{Number(date.slice(-2))} · {name}</li>)}</ul>
+
             </section>
           );
         })}

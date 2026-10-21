@@ -4,7 +4,8 @@ import { getAllTimeLogs, saveTimeLog, deleteTimeLog, getActiveLogDataset, setAct
 import { Navigation } from './components/Navigation';
 import { DailyCalculator } from './components/DailyCalculator';
 import { CalendarView } from './components/CalendarView';
-import { MonthlySummaryView, PopSummaryView, SettingsView } from './components/OtherViews';
+import { SettingsView } from './components/SettingsView';
+import { MonthlySummaryView, PopSummaryView } from './components/OtherViews';
 import { CheckCircle2, X } from 'lucide-react';
 
 interface ToastMessage {
@@ -14,18 +15,17 @@ interface ToastMessage {
 }
 
 export const App: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState<ViewTab>('calculator');
   const [logs, setLogs] = useState<TimeLog[]>([]);
   const [dataset, setDataset] = useState<LogDataset>(() =>
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('sample') === '2026'
       ? 'sample2026' : getActiveLogDataset()
   );
+  const [currentTab, setCurrentTab] = useState<ViewTab>(dataset === 'sample2026' ? 'calendar' : 'calculator');
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
   useEffect(() => {
     setLogs(dataset === 'sample2026' ? initializeSampleLogs() : getAllTimeLogs());
     setActiveLogDataset(dataset);
-    if (dataset === 'sample2026') setCurrentTab('calendar');
   }, [dataset]);
 
   const showToast = (text: string, type: 'success' | 'info' | 'warning' = 'success') => {
@@ -104,15 +104,6 @@ export const App: React.FC = () => {
       {/* Main Content Area */}
       <main className="main-content">
         <div className="content-container">
-          {dataset === 'sample2026' && (
-            <aside className="sample-banner" aria-label="Sample data mode">
-              <div><strong>2026 sample data</strong><span>Your personal logs are kept separate.</span></div>
-              <div className="sample-actions">
-                <button type="button" className="btn-secondary" onClick={() => { setLogs(initializeSampleLogs(true)); showToast('Sample data reset to the original 149 entries.'); }}>Reset sample data</button>
-                <button type="button" className="btn-primary" onClick={usePersonalData}>Use my data</button>
-              </div>
-            </aside>
-          )}
           {currentTab === 'calculator' && (
             <DailyCalculator
               onLogSaved={handleLogSaved}
@@ -125,7 +116,6 @@ export const App: React.FC = () => {
               key={dataset}
               logs={logs}
               isSample={dataset === 'sample2026'}
-              onLoadSample={() => { setDataset('sample2026'); setCurrentTab('calendar'); }}
               onNavigateToCalculator={() => setCurrentTab('calculator')}
               onDeleteLog={handleDeleteLog}
               onSaveLog={handleCalendarSave}
@@ -136,17 +126,24 @@ export const App: React.FC = () => {
 
           {currentTab === 'pop' && <PopSummaryView />}
 
-          {currentTab === 'settings' && <SettingsView />}
+          {currentTab === 'settings' && (
+            <SettingsView
+              isSample={dataset === 'sample2026'}
+              onUseSample={() => setDataset('sample2026')}
+              onUsePersonal={usePersonalData}
+              onResetSample={() => { const restored = initializeSampleLogs(true); setLogs(restored); return restored.length; }}
+            />
+          )}
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="app-footer">
+      {currentTab !== 'calendar' && <footer className="app-footer">
         <div className="footer-container">
           <span>Work Hours Tracker &bull; Node.js + Vite + TypeScript &bull; GitHub Pages Static Architecture</span>
           <span className="footer-spec">Conforms to Design Document v1.0 (0.1hr Work / 0.01hr Leave Precision)</span>
         </div>
-      </footer>
+      </footer>}
     </div>
   );
 };
