@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   getAllTimeLogs,
   getTimeLogByDate,
@@ -98,6 +98,31 @@ describe('Isolated sample workspace', () => {
 
 describe('Monthly report persistence', () => {
   beforeEach(clearStorageForTesting);
+  it.each(['personal', 'sample2026'] as const)('migrates legacy %s PTO policy once without losing report data or later opt-outs', (dataset) => {
+    const key = `work_hours_tracker_${dataset}_monthly_report`;
+    const legacy = getMonthlyReportState(dataset);
+    delete legacy.ptoPolicyVersion;
+    legacy.settings.autoPto = false;
+    legacy.settings.openingPto = 91.23;
+    legacy.entries = [{ id: 'override', date: '2026-03-31', category: 'pto', hours: 0 }];
+    legacy.projectedWork = { '2026-11': 144 };
+    const store = new Map([[key, JSON.stringify(legacy)]]);
+    vi.stubGlobal('window', { localStorage: {
+      getItem: (name: string) => store.get(name) ?? null,
+      setItem: (name: string, value: string) => store.set(name, value),
+    } });
+    try {
+      const migrated = getMonthlyReportState(dataset);
+      expect(migrated).toEqual({ ...legacy, ptoPolicyVersion: 1, settings: { ...legacy.settings, autoPto: true } });
+      expect(JSON.parse(store.get(key)!)).toEqual(migrated);
+      migrated.settings.autoPto = false;
+      saveMonthlyReportState(migrated, dataset);
+      expect(getMonthlyReportState(dataset)).toEqual(migrated);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('persists opening balances, leave entries, and monthly forecasts separately for personal and sample workspaces', () => {
     const personal = getMonthlyReportState();
     personal.settings.openingPto = 91.23;

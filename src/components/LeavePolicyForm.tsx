@@ -25,7 +25,7 @@ export const LeavePolicyForm: React.FC<{ settings: LeaveSettings; onSave: (setti
         <label>Birthday credit month<select className="form-input" name="birthdayMonth" defaultValue={settings.birthdayMonth}>{MONTH_NAMES.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}</select></label>
       </div>
       <label className="checkbox-label"><input type="checkbox" name="autoPto" defaultChecked={settings.autoPto} />Auto-fill historical PTO gaps</label>
-      <p className="settings-description">When enabled, unlogged weekday hours become PTO after holiday, birthday, and overhead hours. Empty months also count as PTO. An explicit PTO entry overrides that month's automatic amount.</p>
+      <p className="settings-description">Enabled by default: unlogged weekday hours become PTO after holiday, birthday, and overhead hours. Empty months also count as PTO. An explicit PTO entry overrides that month's automatic amount.</p>
       <p className="settings-description">Forecasts use the future work rate on remaining non-holiday weekdays. PTO accrues at 0.0851 per hour worked; holiday credits and 8 birthday hours are added at the start of their month. Opening balances and leave entries are saved with the selected data source.</p>
       <div className="sample-actions"><button type="submit" className="btn-primary">Save leave settings</button><span role="status">{saved ? 'Leave and forecast settings saved.' : ''}</span></div>
     </form>

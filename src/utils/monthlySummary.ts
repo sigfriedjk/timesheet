@@ -15,8 +15,8 @@ export interface MonthlyRow {
 }
 
 export function createDefaultMonthlyReport(year = new Date().getFullYear()): MonthlyReportState {
-  return { settings: { openingMonth: `${year}-01`, openingPto: 0, openingHoliday: 0, openingBirthday: 0,
-    birthdayMonth: 1, workPercent: 94.3, autoPto: false }, entries: [], projectedWork: {} };
+  return { ptoPolicyVersion: 1, settings: { openingMonth: `${year}-01`, openingPto: 0, openingHoliday: 0, openingBirthday: 0,
+    birthdayMonth: 1, workPercent: 94.3, autoPto: true }, entries: [], projectedWork: {} };
 }
 
 function monthIndex(key: string) {

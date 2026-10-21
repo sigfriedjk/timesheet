@@ -68,6 +68,7 @@ export interface LeaveSettings {
 }
 
 export interface MonthlyReportState {
+  ptoPolicyVersion?: number; // One-time migration to automatic historical PTO.
   settings: LeaveSettings;
   entries: LeaveEntry[];
   projectedWork: Record<string, number>;

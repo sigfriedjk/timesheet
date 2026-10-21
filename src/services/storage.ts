@@ -164,10 +164,17 @@ export function getMonthlyReportState(dataset: LogDataset = 'personal'): Monthly
     if (!stored) return fallback;
     const parsed = JSON.parse(stored) as MonthlyReportState;
     if (!parsed || !Array.isArray(parsed.entries)) return fallback;
-    return { settings: { ...fallback.settings, ...parsed.settings }, entries: parsed.entries, projectedWork: parsed.projectedWork ?? {} };
+    const state = { ...fallback, ...parsed, settings: { ...fallback.settings, ...parsed.settings }, entries: parsed.entries, projectedWork: parsed.projectedWork ?? {} };
+    // Apply the requested policy once to existing stores, preserving later user opt-outs.
+    if ((parsed.ptoPolicyVersion ?? 0) < 1) {
+      state.ptoPolicyVersion = 1;
+      state.settings.autoPto = true;
+      saveMonthlyReportState(state, dataset);
+    }
+    return state;
   } catch { return fallback; }
 }
 
 export function saveMonthlyReportState(state: MonthlyReportState, dataset: LogDataset = 'personal'): void {
-  setItem(`work_hours_tracker_${dataset}_monthly_report`, JSON.stringify(state));
+  setItem(`work_hours_tracker_${dataset}_monthly_report`, JSON.stringify({ ...state, ptoPolicyVersion: 1 }));
 }

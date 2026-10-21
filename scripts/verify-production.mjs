@@ -119,6 +119,8 @@ try {
     } else if (name === 'monthly') {
       const summary = await evaluate(`({ rows: document.querySelectorAll('.monthly-table tbody tr').length, actual: Number(document.querySelector('[data-stat=year-hours]').textContent), forecast: Number(document.querySelector('.monthly-table tfoot tr').children[4].textContent), currentLeave: parseFloat(document.querySelector('[data-stat=current-leave]').textContent), projectedLeave: parseFloat(document.querySelector('[data-stat=year-end-leave]').textContent) })`);
       if (summary.rows !== 12 || summary.actual !== 1210.7 || !(summary.forecast > summary.actual) || !Number.isFinite(summary.currentLeave) || !Number.isFinite(summary.projectedLeave)) throw new Error(`Monthly report failed: ${JSON.stringify(summary)}`);
+      const automaticPto = await evaluate(`({ january: Number(document.querySelector('[data-month="2026-01"]').children[11].textContent), february: Number(document.querySelector('[data-month="2026-02"]').children[11].textContent) })`);
+      if (automaticPto.january !== 17.7 || automaticPto.february !== 152) throw new Error(`Automatic PTO gaps failed: ${JSON.stringify(automaticPto)}`);
       report.pages.push({ name, url, rendered: true, ...summary });
     } else report.pages.push({ name, url, rendered: true });
     console.log(`Chrome verified ${name} page: ${url}`);
@@ -126,6 +128,7 @@ try {
   await evaluate(`Array.from(document.querySelectorAll('.nav-tab-btn')).find(button => button.textContent.trim() === 'Settings').click()`);
   for (let i = 0; i < 50 && !await evaluate(`!!document.querySelector('.settings-view')`); i++) await delay(100);
   if (!await evaluate(`!!document.querySelector('.settings-view input[value=sample2026]:checked') && !!document.querySelector('.settings-view .sample-coverage')`)) throw new Error('Settings is missing the active sample selection or coverage/downloads');
+  if (!await evaluate(`document.querySelector('input[name=autoPto]')?.checked === true`)) throw new Error('Automatic historical PTO must be enabled by default');
   await evaluate(`document.querySelector('.dataset-selector input[value=personal]').click()`);
   for (let i = 0; i < 50 && !await evaluate(`!!document.querySelector('.settings-view input[value=personal]:checked')`); i++) await delay(100);
   if (!await evaluate(`!!document.querySelector('.settings-view input[value=personal]:checked') && !location.search.includes('sample')`)) throw new Error('Switching to personal data must stay in Settings and clear the sample query');
