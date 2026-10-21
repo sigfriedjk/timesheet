@@ -2,18 +2,20 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { EnvHttpProxyAgent, fetch } from 'undici';
 
 const site = new URL(process.argv[2] || 'https://sigfriedjk.github.io/timesheet/');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const report = { site: site.href, checkedAt: new Date().toISOString(), responses: [], pages: [] };
 const output = path.resolve('work/production-check');
+const dispatcher = new EnvHttpProxyAgent();
 await fs.mkdir(output, { recursive: true });
 
 async function get(url) {
   let lastError;
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(20000), redirect: 'follow' });
+      const response = await fetch(url, { dispatcher, signal: AbortSignal.timeout(20000), redirect: 'follow' });
       const body = await response.text();
       const contentType = response.headers.get('content-type') || '';
       console.log(`HTTP ${response.status} ${url} (${contentType})`);
@@ -45,14 +47,23 @@ try {
     if (!/javascript|text\/css/.test(result.contentType)) throw new Error(`Wrong asset content type: ${asset}`);
   }
 
-  const chrome = ['google-chrome', 'chromium', 'chromium-browser'].map(name => {
+  const chrome = process.env.CHROME_PATH || ['google-chrome', 'chromium', 'chromium-browser'].map(name => {
     const found = spawnSync('which', [name], { encoding: 'utf8' });
     return found.status === 0 ? found.stdout.trim() : null;
   }).find(Boolean);
   if (!chrome) throw new Error('Chrome/Chromium is required for the production browser check');
   profile = await fs.mkdtemp(path.join(os.tmpdir(), 'timesheet-smoke-'));
   let stderr = '';
-  browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const proxy = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy;
+  const proxyArgs = [];
+  if (proxy) {
+    const proxyUrl = new URL(proxy);
+    if (proxyUrl.username || proxyUrl.password) throw new Error('Chrome requires a proxy without credentials in its URL.');
+    // Chrome does not inherit HTTP(S)_PROXY. Preserve the managed egress path;
+    // its default loopback bypass still allows a local production preview.
+    proxyArgs.push(`--proxy-server=${proxyUrl.origin}`);
+  }
+  browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', ...proxyArgs, '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   browser.stderr.on('data', data => { stderr += data.toString(); });
   let endpoint;
   for (let i = 0; i < 150; i++) {
@@ -170,4 +181,5 @@ try {
     await Promise.race([new Promise(resolve => browser.once('exit', resolve)), delay(3000)]);
   }
   if (profile) await fs.rm(profile, { recursive: true, force: true, maxRetries: 3 }).catch(() => {});
+  await dispatcher.close();
 }
