@@ -5,6 +5,9 @@ import {
   saveTimeLog,
   deleteTimeLog,
   clearStorageForTesting,
+  initializeSampleLogs,
+  getActiveLogDataset,
+  setActiveLogDataset,
 } from './storage';
 
 describe('Storage Service (Local-First Persistence & Overwrite Logic)', () => {
@@ -50,5 +53,43 @@ describe('Storage Service (Local-First Persistence & Overwrite Logic)', () => {
     const deleted = deleteTimeLog('2026-10-15');
     expect(deleted).toBe(true);
     expect(getTimeLogByDate('2026-10-15')).toBeUndefined();
+  });
+});
+
+describe('Isolated sample workspace', () => {
+  beforeEach(clearStorageForTesting);
+
+  it('loads sample entries without replacing personal entries on overlapping dates', () => {
+    saveTimeLog('2026-01-02', 7.5, 'My real entry');
+    expect(initializeSampleLogs()).toHaveLength(149);
+    expect(getTimeLogByDate('2026-01-02')?.totalHours).toBe(7.5);
+    expect(getTimeLogByDate('2026-01-02', 'sample2026')?.totalHours).toBe(6);
+    expect(getAllTimeLogs()).toHaveLength(1);
+  });
+
+  it('keeps sample edits and deletions isolated and restores only the sample when reset', () => {
+    const personal = saveTimeLog('2026-01-02', 7.5, 'Personal').log;
+    initializeSampleLogs();
+    saveTimeLog('2026-01-02', 9.3, 'Test edit', 'sample2026');
+    deleteTimeLog('2026-01-05', 'sample2026');
+    expect(initializeSampleLogs()).toHaveLength(148);
+    expect(getTimeLogByDate('2026-01-02', 'sample2026')?.totalHours).toBe(9.3);
+    expect(initializeSampleLogs(true)).toHaveLength(149);
+    expect(getTimeLogByDate('2026-01-02', 'sample2026')?.totalHours).toBe(6);
+    expect(getAllTimeLogs()).toEqual([personal]);
+  });
+
+  it('does not recreate deleted sample records without an explicit reset', () => {
+    for (const log of initializeSampleLogs()) deleteTimeLog(log.date, 'sample2026');
+    expect(initializeSampleLogs()).toEqual([]);
+    expect(getAllTimeLogs()).toEqual([]);
+  });
+
+  it('remembers the selected workspace without mixing the stored records', () => {
+    expect(getActiveLogDataset()).toBe('personal');
+    setActiveLogDataset('sample2026');
+    expect(getActiveLogDataset()).toBe('sample2026');
+    setActiveLogDataset('personal');
+    expect(getActiveLogDataset()).toBe('personal');
   });
 });

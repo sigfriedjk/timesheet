@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ViewTab, TimeLog } from './types';
-import { getAllTimeLogs, saveTimeLog, deleteTimeLog } from './services/storage';
+import { getAllTimeLogs, saveTimeLog, deleteTimeLog, getActiveLogDataset, setActiveLogDataset, initializeSampleLogs, LogDataset } from './services/storage';
 import { Navigation } from './components/Navigation';
 import { DailyCalculator } from './components/DailyCalculator';
 import { CalendarView } from './components/CalendarView';
@@ -16,12 +16,17 @@ interface ToastMessage {
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<ViewTab>('calculator');
   const [logs, setLogs] = useState<TimeLog[]>([]);
+  const [dataset, setDataset] = useState<LogDataset>(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('sample') === '2026'
+      ? 'sample2026' : getActiveLogDataset()
+  );
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
-  // Load saved logs on mount
   useEffect(() => {
-    setLogs(getAllTimeLogs());
-  }, []);
+    setLogs(dataset === 'sample2026' ? initializeSampleLogs() : getAllTimeLogs());
+    setActiveLogDataset(dataset);
+    if (dataset === 'sample2026') setCurrentTab('calendar');
+  }, [dataset]);
 
   const showToast = (text: string, type: 'success' | 'info' | 'warning' = 'success') => {
     setToast({ id: Date.now().toString(), type, text });
@@ -34,9 +39,10 @@ export const App: React.FC = () => {
     const { log, isOverwrite } = saveTimeLog(
       logData.date,
       logData.totalHours,
-      logData.notes
+      logData.notes,
+      dataset
     );
-    setLogs(getAllTimeLogs());
+    setLogs(getAllTimeLogs(dataset));
 
     const message = isOverwrite
       ? `Overwrote log for ${log.date}: updated to ${log.totalHours.toFixed(1)} hrs`
@@ -49,14 +55,23 @@ export const App: React.FC = () => {
 
   const handleDeleteLog = (date: string) => {
     if (window.confirm(`Are you sure you want to delete the time log for ${date}?`)) {
-      deleteTimeLog(date);
-      setLogs(getAllTimeLogs());
+      deleteTimeLog(date, dataset);
+      setLogs(getAllTimeLogs(dataset));
       showToast(`Deleted entry for ${date}`, 'info');
     }
   };
 
-  const handleEditLog = (_log: TimeLog) => {
-    setCurrentTab('calculator');
+  const handleCalendarSave = (date: string, hours: number, notes: string) => {
+    saveTimeLog(date, hours, notes, dataset);
+    setLogs(getAllTimeLogs(dataset));
+    showToast(`Saved ${hours.toFixed(1)} hrs for ${date}`);
+  };
+
+  const usePersonalData = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('sample');
+    window.history.replaceState(null, '', url);
+    setDataset('personal');
   };
 
   return (
@@ -89,6 +104,15 @@ export const App: React.FC = () => {
       {/* Main Content Area */}
       <main className="main-content">
         <div className="content-container">
+          {dataset === 'sample2026' && (
+            <aside className="sample-banner" aria-label="Sample data mode">
+              <div><strong>2026 sample data</strong><span>Your personal logs are kept separate.</span></div>
+              <div className="sample-actions">
+                <button type="button" className="btn-secondary" onClick={() => { setLogs(initializeSampleLogs(true)); showToast('Sample data reset to the original 149 entries.'); }}>Reset sample data</button>
+                <button type="button" className="btn-primary" onClick={usePersonalData}>Use my data</button>
+              </div>
+            </aside>
+          )}
           {currentTab === 'calculator' && (
             <DailyCalculator
               onLogSaved={handleLogSaved}
@@ -98,10 +122,13 @@ export const App: React.FC = () => {
 
           {currentTab === 'calendar' && (
             <CalendarView
+              key={dataset}
               logs={logs}
+              isSample={dataset === 'sample2026'}
+              onLoadSample={() => { setDataset('sample2026'); setCurrentTab('calendar'); }}
               onNavigateToCalculator={() => setCurrentTab('calculator')}
               onDeleteLog={handleDeleteLog}
-              onEditLog={handleEditLog}
+              onSaveLog={handleCalendarSave}
             />
           )}
 
