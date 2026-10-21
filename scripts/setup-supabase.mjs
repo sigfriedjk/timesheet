@@ -1,8 +1,8 @@
 // Server-only Management API setup. A project secret key is deliberately never used here.
 import { readFile } from 'node:fs/promises';
 import { EnvHttpProxyAgent, fetch } from 'undici';
-const token = process.env.SUPABASE_ACCESS_TOKEN;
-if (!token) throw new Error('Schema/Auth configuration requires SUPABASE_ACCESS_TOKEN (Management API), or apply the migration with the SQL Editor/PostgreSQL and configure Auth in the dashboard. SUPABASE_SECRET_KEY cannot substitute for this capability.');
+const token = process.env.SUPABASE_MASTER || process.env.SUPABASE_ACCESS_TOKEN;
+if (!token) throw new Error('Schema/Auth configuration requires SUPABASE_MASTER or SUPABASE_ACCESS_TOKEN (Management API), or apply the migration with the SQL Editor/PostgreSQL and configure Auth in the dashboard. SUPABASE_SECRET_KEY cannot substitute for this capability.');
 const projectRef = 'yiqquogdutgujsacoezh';
 const dispatcher = new EnvHttpProxyAgent();
 async function request(path, method = 'GET', body) {

@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   for (const [name, value = ''] of Object.entries(browserEnv)) {
     let privilegedJwt = false;
     try { privilegedJwt = JSON.parse(Buffer.from(value.split('.')[1], 'base64url').toString()).role === 'service_role'; } catch { /* Public modern keys are not JWTs. */ }
-    if (/secret|service_role|password/i.test(name) || value.startsWith('sb_secret_') || privilegedJwt) {
+    if (/secret|service_role|password|supabase_master|supabase_access_token/i.test(name) || /^(sb_secret_|sbp_)/.test(value) || privilegedJwt) {
       throw new Error(`Refusing to expose privileged credentials through ${name}. Use public browser credentials only.`);
     }
   }

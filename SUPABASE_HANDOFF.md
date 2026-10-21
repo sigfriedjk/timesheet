@@ -12,6 +12,7 @@
 
 ## Current resume — October 21, 2026
 
+- The user added a full-permission Management token named `SUPABASE_MASTER`. Fresh process checks and current runtime-status observations still show it absent/unlisted; the environment configuration must reach this runtime before it can be used. Setup now prefers `SUPABASE_MASTER`, then falls back to `SUPABASE_ACCESS_TOKEN`. Never print either value. Vite rejects Management-token literals and `VITE_SUPABASE_MASTER`/`VITE_SUPABASE_ACCESS_TOKEN` before bundling.
 - Checked out `wip/supabase-integration-20261021` from GitHub. Production `main` is still `17d7bb8`.
 - The current environment reports all Supabase variables ready, including `SUPABASE_ACCESS_TOKEN`, and enforces access to `api.supabase.com`, `*.supabase.co`, and production. Commands need `sandbox_permissions: with_additional_permissions` and `additional_permissions.network.enabled: true`. No credential values were printed.
 - `npm run setup:supabase` successfully applied the migration through the supported Management database/query endpoint, then failed at Auth PATCH with HTTP 403: `Missing required permission(s): project_admin_write`. Auth GET succeeds; its Site URL is still `http://localhost:3000` and redirect allowlist is empty. The user has been asked to update token permissions or set the production Site URL/redirect in the dashboard. Do not work around the missing permission through database internals.
