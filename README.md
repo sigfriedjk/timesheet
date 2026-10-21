@@ -43,7 +43,12 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
    * Work-hour and leave precision remain 0.1 and 0.01 hours respectively. Weekday hours in this table include holidays; holiday credits are tracked separately, following the reference workbook's structure.
    * Up to 12 tracked months are used for rolling averages, including empty tracked months as zero. Partial windows are labeled; the top rolling average uses completed months.
 
-4. **Domain Types & Architectural Scaffolding:**
+4. **POP Summary:**
+   * A table modeled on the reference POP report: weekdays, weekday hours, funded hours, funded percentage, worked hours, and signed funded-minus-worked hours, with totals.
+   * Settings lists 24 fixed, inclusive date ranges and funded amounts, named POP A–X. These definitions are shared across data sources; worked hours come only from the selected workspace's daily logs.
+   * Filter by overlapping year or show all periods. Cross-year POPs retain their complete ranges and funding. An actuals cutoff excludes future logs; weekend and holiday work still counts.
+
+5. **Domain Types & Architectural Scaffolding:**
    * Fully typed domain entities (`TimeLog`, `PeriodOfPerformance`, `LeaveAdjustment`).
    * Local-first persistence repository ready for Supabase client synchronization.
    * Navigation tabs for all 5 core application interfaces.
@@ -56,7 +61,7 @@ Open [the sample calendar](https://sigfriedjk.github.io/timesheet/?sample=2026) 
 
 The deterministic sample covers January 1 through October 20, 2026 with 149 logged days and 1,210.7 hours. February and August are empty; July 13–17 is a week off. It includes scattered days off, worked and unworked holidays, a Saturday shift, and daily hours from 6.0 to 10.0. Populated full months test just-below, exact, and just-above rounded 94% targets; October is partial. Unlogged dates indicate absent entries, not explicit leave records.
 
-In Settings, expand **2026 sample data coverage & downloads** to download the original sample as CSV or JSON. The monthly summary uses these same logs. POP summaries remain a scaffold for future implementation.
+In Settings, expand **2026 sample data coverage & downloads** to download the original sample as CSV or JSON. Monthly and POP summaries use these same logs.
 
 ---
 
@@ -104,7 +109,7 @@ Outputs static production assets to `./dist/`, ready for direct deployment to Gi
     │   ├── DailyCalculator.tsx  # Interface 1: Daily calculator & target projections
     │   ├── CalendarView.tsx     # Interface 2: Calendar & historical log table
     │   ├── Navigation.tsx       # Header tab navigation
-    │   └── OtherViews.tsx       # Interfaces 3, 4, 5 previews & placeholders
+    │   └── PopSummaryView.tsx   # Funded versus worked hours by POP
     ├── services/
     │   ├── storage.ts       # Local-first persistence repository (with overwrite logic)
     │   └── storage.test.ts  # Persistence & overwrite unit tests
@@ -141,3 +146,9 @@ Opening balances default to zero at January of the current year (January 2026 fo
 Click a month to add dated PTO, holiday, birthday, overhead, or signed PTO adjustment entries. Future dates are planned leave. The month editor also allows a total-work-hours forecast override for incomplete/future months; a zero override is supported, and completed months always use recorded work. Resetting sample data also resets only the sample report settings/leave entries/forecasts.
 
 US federal credits are counted on observed weekdays to avoid double credit for actual and observed dates. Unworked observed holidays default to holiday usage; explicit holiday entries override that month's actual/planned portion. PTO earns 0.0851 hours per worked hour, holiday credits are granted at the start of their month, and birthday credit is 8 hours at the start of the configured month. Historical PTO automatically fills weekday gaps after work and other leave, including empty months. Explicit PTO entries (including zero) override the automatic amount. Existing report settings are migrated once to enable this policy while retaining balances, entries, and forecasts; later opt-outs in Settings persist. Forecast PTO covers future weekday shortfalls after other leave; balances can be negative.
+
+## POP Summary
+
+Open `?view=pop` or `?sample=2026&view=pop`. Fixed POP definitions live in `src/config/periodsOfPerformance.ts` and appear in **Settings → Periods of performance**. The 24 periods span April 25, 2024 through June 30, 2027, including mid-month and cross-year boundaries. Names are generic POP A–X; original aliases and the workbook's worked-hour amounts are not imported. Dates and funded amounts are hardcoded for now; editing periods in the interface is deferred.
+
+The year filter selects full periods overlapping the selected year. Weekday hours include holidays, matching the reference: Monday–Friday days × 8. Funded percentage is funded hours divided by weekday hours; totals use a weighted percentage. Worked hours sum daily logs within the inclusive range through the actuals cutoff, including weekend and holiday shifts. Future logs and work projections are excluded. Funded-minus-worked hours remain signed so overruns are visible. Sample data through October 20, 2026 yields 1,915.0 funded hours, 1,210.7 worked hours, and 704.3 hours remaining across five 2026 POPs.

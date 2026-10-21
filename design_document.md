@@ -157,7 +157,7 @@ Represents manual overrides or adjustments to the running leave balance for a gi
 
 ### Interface 4: POP Pivot Summary View
 
-* **POP Summary Table:** Aggregates logged time grouped by user-defined Period of Performance date ranges.
+* **POP Summary Table:** Aggregates logged time by inclusive Period of Performance ranges. The current release uses 24 fixed definitions, POP A–X, from April 25, 2024 through June 30, 2027. Settings displays the dates and funded amounts; interactive editing is deferred.
 
 * **Columns:**
 
@@ -165,17 +165,23 @@ Represents manual overrides or adjustments to the running leave balance for a gi
 
   2. `Date Range` (`Start Date` to `End Date`)
 
-  3. `Logged Hours` (Sum of `TimeLog.totalHours` within date range, rounded to 0.1)
+  3. `Weekdays` (Monday–Friday, including holidays)
 
-  4. `Target Hours` (Configured goal, rounded to 0.1)
+  4. `Weekday Hours` (Weekdays × 8)
 
-  5. `Remaining Hours` (`Target Hours - Logged Hours`, rounded to 0.1)
+  5. `Funded Hours` (Fixed funding for the full period)
 
-  6. `Completion %`
+  6. `Funded %` (Funded hours ÷ weekday hours; total uses a weighted percentage)
+
+  7. `Worked` (Sum of daily logs through the actuals cutoff, including weekend/holiday work, rounded to 0.1)
+
+  8. `Funded − Worked` (Signed difference, rounded to 0.1; negative indicates an overrun)
+
+The year filter selects full POPs overlapping that year without truncating cross-year ranges. All-years mode displays all 24 periods. Future logs and estimates are excluded from worked hours. Definitions are shared between personal and sample workspaces while worked hours remain isolated.
 
 ### Interface 5: POP & System Settings
 
-* **POP Manager:** Form to add, edit, or remove Periods of Performance.
+* **POP Definitions:** Read-only table of the hardcoded dates and funded hours. A form to add, edit, or remove periods is deferred.
 
 * **Leave Adjustments Manager:** Form to view and insert manual leave balance adjustments (corresponding to column U).
 

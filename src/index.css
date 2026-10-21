@@ -1001,3 +1001,18 @@ body {
 }
 
 .monthly-table .rolling-cell small { display: block; color: var(--text-muted); font-size: 0.56rem; }
+
+/* Period of performance report */
+.pop-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+.pop-status { display: block; font-size: 0.6rem; font-weight: 400; color: var(--text-muted); margin-top: 0.2rem; }
+.pop-table .month-column, .pop-settings-table .month-column { min-width: 85px; }
+.pop-table .active-pop td, .pop-table .active-pop th { background: #213953; }
+.pop-table .active-pop .pop-status { color: #93c5fd; }
+.pop-table .pop-date-range { text-align: left; }
+.pop-settings { margin-bottom: 1.5rem; }
+.pop-settings-scroll { max-height: 320px; margin-top: 0.75rem; }
+@media (max-width: 420px) {
+  .pop-stats { gap: 0.4rem; }
+  .pop-stats .summary-stat > strong { font-size: 1rem; }
+  .pop-stats .summary-stat { padding: 0.55rem; }
+}

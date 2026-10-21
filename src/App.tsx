@@ -5,7 +5,7 @@ import { Navigation } from './components/Navigation';
 import { DailyCalculator } from './components/DailyCalculator';
 import { CalendarView } from './components/CalendarView';
 import { SettingsView } from './components/SettingsView';
-import { PopSummaryView } from './components/OtherViews';
+import { PopSummaryView } from './components/PopSummaryView';
 import { MonthlySummaryView } from './components/MonthlySummaryView';
 import { CheckCircle2, X } from 'lucide-react';
 
@@ -136,7 +136,7 @@ export const App: React.FC = () => {
 
           {currentTab === 'monthly' && <MonthlySummaryView key={dataset} logs={logs} state={reportState} isSample={dataset === 'sample2026'} onChange={updateReportState} onOpenSettings={() => setCurrentTab('settings')} />}
 
-          {currentTab === 'pop' && <PopSummaryView />}
+          {currentTab === 'pop' && <PopSummaryView key={dataset} logs={logs} isSample={dataset === 'sample2026'} onOpenSettings={() => setCurrentTab('settings')} />}
 
           {currentTab === 'settings' && (
             <SettingsView
@@ -152,7 +152,7 @@ export const App: React.FC = () => {
       </main>
 
       {/* Footer */}
-      {currentTab !== 'calendar' && currentTab !== 'monthly' && <footer className="app-footer">
+      {currentTab !== 'calendar' && currentTab !== 'monthly' && currentTab !== 'pop' && <footer className="app-footer">
         <div className="footer-container">
           <span>Work Hours Tracker &bull; Node.js + Vite + TypeScript &bull; GitHub Pages Static Architecture</span>
           <span className="footer-spec">Conforms to Design Document v1.0 (0.1hr Work / 0.01hr Leave Precision)</span>

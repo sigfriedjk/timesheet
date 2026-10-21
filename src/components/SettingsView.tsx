@@ -4,6 +4,7 @@ import { LeaveSettings } from '../types';
 import { LeavePolicyForm } from './LeavePolicyForm';
 import { MONTH_NAMES } from '../utils/calendar';
 import { SAMPLE_MONTH_NOTES, createSampleTimeLogs2026, sampleDataCsv } from '../services/sampleData';
+import { POP_PERIODS } from '../config/periodsOfPerformance';
 
 interface SettingsViewProps {
   isSample: boolean;
@@ -30,6 +31,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isSample, leaveSetti
   return (
     <div className="settings-view">
       <div className="view-header"><h2>Settings</h2></div>
+      <section className="calculator-card pop-settings" aria-labelledby="pop-settings-title">
+        <h3 id="pop-settings-title" className="card-title">Periods of performance</h3>
+        <p className="settings-description">These 24 POP ranges and funded hours are fixed for now and shared by both data sources. Start and end dates are inclusive.</p>
+        <div className="monthly-table-scroll pop-settings-scroll" tabIndex={0} aria-label="Fixed POP ranges and funded hours">
+          <table className="monthly-table pop-settings-table">
+            <thead><tr><th scope="col" className="month-column">POP</th><th scope="col">Start date</th><th scope="col">End date</th><th scope="col">Funded hours</th></tr></thead>
+            <tbody>{POP_PERIODS.map(period => <tr key={period.id} data-period={period.id}><th scope="row" className="month-column">{period.name}</th><td><time dateTime={period.startDate}>{period.startDate}</time></td><td><time dateTime={period.endDate}>{period.endDate}</time></td><td>{period.targetHours.toFixed(1)}</td></tr>)}</tbody>
+          </table>
+        </div>
+      </section>
       <LeavePolicyForm key={isSample ? 'sample' : 'personal'} settings={leaveSettings} onSave={onSaveLeaveSettings} />
       <section className="calculator-card sample-settings" aria-labelledby="sample-settings-title">
         <h3 id="sample-settings-title" className="card-title">Data source</h3>

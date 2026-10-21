@@ -97,11 +97,12 @@ try {
     ['normal', site.href, '.calculator-view'],
     ['sample', new URL('?sample=2026', site).href, '.year-calendar'],
     ['monthly', new URL('?sample=2026&view=monthly', site).href, '.monthly-view'],
+    ['pop', new URL('?sample=2026&view=pop', site).href, '.pop-view'],
   ]) {
     await send('Page.navigate', { url }, sessionId);
     let ready = false;
     for (let i = 0; i < 200; i++) {
-      ready = await evaluate(name === 'monthly' ? `document.querySelector('[data-stat=year-hours]')?.textContent === '1210.7'` : name === 'sample' ? `document.querySelectorAll('.calendar-logged').length === 149` : `!!document.querySelector(${JSON.stringify(selector)})`);
+      ready = await evaluate(name === 'monthly' ? `document.querySelector('[data-stat=year-hours]')?.textContent === '1210.7'` : name === 'pop' ? `document.querySelector('[data-stat=pop-worked]')?.textContent === '1210.7'` : name === 'sample' ? `document.querySelectorAll('.calendar-logged').length === 149` : `!!document.querySelector(${JSON.stringify(selector)})`);
       if (ready) break;
       await delay(200);
     }
@@ -122,6 +123,13 @@ try {
       const automaticPto = await evaluate(`({ january: Number(document.querySelector('[data-month="2026-01"]').children[11].textContent), february: Number(document.querySelector('[data-month="2026-02"]').children[11].textContent) })`);
       if (automaticPto.january !== 17.7 || automaticPto.february !== 152) throw new Error(`Automatic PTO gaps failed: ${JSON.stringify(automaticPto)}`);
       report.pages.push({ name, url, rendered: true, ...summary });
+    } else if (name === 'pop') {
+      const summary = await evaluate(`({ rows: document.querySelectorAll('.pop-table tbody tr').length, funded: Number(document.querySelector('[data-stat=pop-funded]').textContent), worked: Number(document.querySelector('[data-stat=pop-worked]').textContent), remaining: Number(document.querySelector('[data-stat=pop-remaining]').textContent), active: document.querySelector('.active-pop')?.getAttribute('data-pop') })`);
+      if (summary.rows !== 5 || summary.funded !== 1915 || summary.worked !== 1210.7 || summary.remaining !== 704.3 || summary.active !== 'pop-q') throw new Error(`POP report failed: ${JSON.stringify(summary)}`);
+      await evaluate(`(() => { const select = document.querySelector('select[aria-label="POP year"]'); select.value = 'all'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      for (let i = 0; i < 50 && !await evaluate(`document.querySelectorAll('.pop-table tbody tr').length === 24`); i++) await delay(100);
+      if (!await evaluate(`document.querySelectorAll('.pop-table tbody tr').length === 24`)) throw new Error('POP all-years filter failed');
+      report.pages.push({ name, url, rendered: true, ...summary, allPeriods: 24 });
     } else report.pages.push({ name, url, rendered: true });
     console.log(`Chrome verified ${name} page: ${url}`);
   }
@@ -129,6 +137,7 @@ try {
   for (let i = 0; i < 50 && !await evaluate(`!!document.querySelector('.settings-view')`); i++) await delay(100);
   if (!await evaluate(`!!document.querySelector('.settings-view input[value=sample2026]:checked') && !!document.querySelector('.settings-view .sample-coverage')`)) throw new Error('Settings is missing the active sample selection or coverage/downloads');
   if (!await evaluate(`document.querySelector('input[name=autoPto]')?.checked === true`)) throw new Error('Automatic historical PTO must be enabled by default');
+  if (!await evaluate(`document.querySelectorAll('.pop-settings-table tbody tr').length === 24 && document.querySelector('[data-period="pop-x"]').textContent.includes('2027-06-30')`)) throw new Error('Settings must list all 24 fixed POP ranges');
   await evaluate(`document.querySelector('.dataset-selector input[value=personal]').click()`);
   for (let i = 0; i < 50 && !await evaluate(`!!document.querySelector('.settings-view input[value=personal]:checked')`); i++) await delay(100);
   if (!await evaluate(`!!document.querySelector('.settings-view input[value=personal]:checked') && !location.search.includes('sample')`)) throw new Error('Switching to personal data must stay in Settings and clear the sample query');
@@ -139,7 +148,7 @@ try {
   console.log('Chrome verified Settings sample controls and data-source switching.');
   if (exceptions.length) throw new Error(`Browser errors: ${exceptions.join('; ')}`);
   report.success = true;
-  console.log('Production HTTP, JavaScript/CSS, calculator, calendar, monthly report, and Settings checks passed.');
+  console.log('Production HTTP, JavaScript/CSS, calculator, calendar, monthly report, POP report, and Settings checks passed.');
 } catch (error) {
   report.success = false;
   report.error = error.message;

@@ -17,7 +17,7 @@ export interface PeriodOfPerformance {
   name: string; // e.g. "POP 1 - Prime Contract"
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
-  targetHours?: number; // Optional target total hours
+  targetHours: number; // Funded work hours for the full inclusive date range
 }
 
 export interface LeaveAdjustment {
