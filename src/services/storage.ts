@@ -157,6 +157,15 @@ export function initializeSampleLogs(reset = false): TimeLog[] {
   return getAllTimeLogs('sample2026');
 }
 
+/** Merge a validated JSON file into the sample store in one write, preserving existing dates. */
+export function importSampleLogs(logs: TimeLog[]): number {
+  const existing = getAllTimeLogs('sample2026');
+  const dates = new Set(existing.map(log => log.date));
+  const missing = logs.filter(log => !dates.has(log.date));
+  setItem(STORAGE_KEYS.SAMPLE_LOGS, JSON.stringify([...existing, ...missing].sort((a, b) => b.date.localeCompare(a.date))));
+  return missing.length;
+}
+
 export function getMonthlyReportState(dataset: LogDataset = 'personal'): MonthlyReportState {
   const fallback = createDefaultMonthlyReport(dataset === 'sample2026' ? 2026 : new Date().getFullYear());
   try {
