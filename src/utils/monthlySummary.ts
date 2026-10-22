@@ -44,15 +44,25 @@ function total(entries: LeaveEntry[], category: LeaveEntry['category']) {
 }
 function has(entries: LeaveEntry[], category: LeaveEntry['category']) { return entries.some(entry => entry.category === category); }
 
+/** Include every saved monthly input, empty intervening months and year-end forecasts. */
+export function getMonthlySummaryRange(logs: TimeLog[], state: MonthlyReportState, asOf: string) {
+  const months = [state.settings.openingMonth, ...logs.map(log => log.date.slice(0, 7)),
+    ...state.entries.map(entry => entry.date.slice(0, 7)), ...Object.keys(state.projectedWork)];
+  const firstMonth = months.reduce((first, month) => month < first ? month : first);
+  const lastMonth = `${months.reduce((last, month) => month > last ? month : last, asOf.slice(0, 7)).slice(0, 4)}-12`;
+  const firstYear = Number(firstMonth.slice(0, 4)), lastYear = Number(lastMonth.slice(0, 4));
+  return { firstMonth, lastMonth, years: Array.from({ length: lastYear - firstYear + 1 }, (_, offset) => firstYear + offset) };
+}
+
 /** Actual leave uses dated entries. Forecasts fill remaining weekday gaps; neither writes daily logs. */
-export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, selectedYear: number, asOf: string) {
+export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, selectedYear: number | 'all', asOf: string) {
   const { settings, entries, projectedWork } = state;
   const cutoffMonth = monthIndex(asOf.slice(0, 7));
   const opening = monthIndex(settings.openingMonth);
-  const selectedStart = selectedYear * 12;
-  const selectedEnd = selectedStart + 11;
-  const earliestLog = logs.length ? Math.min(...logs.map(log => monthIndex(log.date.slice(0, 7)))) : opening;
-  const historyStart = Math.min(opening, earliestLog);
+  const range = getMonthlySummaryRange(logs, state, asOf);
+  const selectedStart = selectedYear === 'all' ? monthIndex(range.firstMonth) : selectedYear * 12;
+  const selectedEnd = selectedYear === 'all' ? monthIndex(range.lastMonth) : selectedStart + 11;
+  const historyStart = monthIndex(range.firstMonth);
   const start = Math.min(opening, selectedStart - 11, historyStart);
   const end = Math.max(selectedEnd, cutoffMonth);
   const logMap = new Map(logs.map(log => [log.date, log]));
@@ -133,7 +143,7 @@ export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, 
     row.rollingTotal = tenths(window.reduce((sum, i) => sum + (rows.get(i)?.workHours ?? 0), 0));
     row.rollingAverage = window.length ? tenths(row.rollingTotal / window.length) : 0;
   }
-  const selectedRows = Array.from({ length: 12 }, (_, month) => rows.get(selectedStart + month)!);
+  const selectedRows = Array.from({ length: selectedEnd - selectedStart + 1 }, (_, month) => rows.get(selectedStart + month)!);
   const sum = (field: keyof Pick<MonthlyRow, 'weekdayHours' | 'holidayCount' | 'actualHours' | 'workHours' | 'leaveNeeded' | 'accruedPto' | 'accruedHoliday' | 'accruedBirthday' | 'usedPto' | 'usedHoliday' | 'usedBirthday' | 'overhead' | 'adjustment'>) =>
     cents(selectedRows.reduce((value, row) => value + row[field], 0));
   const actualCutoffIndex = Math.min(selectedEnd, cutoffMonth);
@@ -147,7 +157,7 @@ export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, 
       accruedHoliday: sum('accruedHoliday'), accruedBirthday: sum('accruedBirthday'), usedPto: sum('usedPto'),
       usedHoliday: sum('usedHoliday'), usedBirthday: sum('usedBirthday'), overhead: sum('overhead'), adjustment: sum('adjustment') },
     currentBalance: actualCutoffIndex >= opening ? rows.get(actualCutoffIndex)?.actualBalance ?? null : null,
-    yearEndBalance: selectedRows[11].balance,
+    yearEndBalance: selectedRows[selectedRows.length - 1].balance,
     rolling: { total: actualRollingTotal, average: completedWindow.length ? tenths(actualRollingTotal / completedWindow.length) : null,
       months: completedWindow.length, start: monthKey(completedIndex - 11), end: monthKey(completedIndex) },
   };

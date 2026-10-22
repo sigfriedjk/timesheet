@@ -270,6 +270,51 @@ test('day editor stays open on failure and closes after an acknowledged save; de
   await expect(page.locator('.calendar-logged')).toHaveCount(0);
 });
 
+for (const width of [390, 1280]) test(`summaries default to All Years and show every row with page scrolling at ${width}px`, async ({ page }) => {
+  const state = await backend(page);
+  state.logs = [entry('2025-01-02', 8), entry('2026-01-02', 9), entry('2027-09-01', 10)];
+  state.report = { ...report, settings: { ...report.settings, openingMonth: '2024-11', autoPto: false },
+    entries: [{ id: 'january-2026', date: '2026-01-03', category: 'pto', hours: 3 }], projectedWork: { '2028-03': 100 } };
+  await page.setViewportSize({ width, height: 900 });
+  await page.goto('/?view=monthly');
+  const year = page.getByLabel('Monthly summary year', { exact: true });
+  await expect(year).toHaveValue('all');
+  await expect(page.locator('.monthly-table tbody tr')).toHaveCount(50);
+  await expect(page.locator('[data-month="2025-01"] th')).toContainText('Jan 2025');
+  await expect(page.locator('[data-month="2026-01"] th')).toContainText('Jan 2026');
+  await expect(page.locator('[data-stat=year-hours]')).toHaveText('17');
+  const wrapper = page.locator('.monthly-table-scroll');
+  expect(await wrapper.evaluate(el => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+  await page.locator('[data-month="2028-12"]').scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
+  expect(await wrapper.evaluate(el => el.scrollTop)).toBe(0);
+  await year.selectOption('2025');
+  await expect(page.locator('.monthly-table tbody tr')).toHaveCount(12);
+  await expect(page.locator('[data-month="2026-01"]')).toHaveCount(0);
+  await expect(page.locator('[data-stat=year-hours]')).toHaveText('8');
+  await page.getByRole('button', { name: 'Edit January 2025 leave', exact: true }).click();
+  const editor = page.getByRole('form', { name: 'January 2025' });
+  await editor.getByLabel('PTO entered', { exact: true }).fill('2');
+  await editor.getByRole('button', { name: 'Save month', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  expect(state.report.entries).toEqual(expect.arrayContaining([
+    expect.objectContaining({ date: '2025-01-31', category: 'pto', hours: 2 }),
+    { id: 'january-2026', date: '2026-01-03', category: 'pto', hours: 3 },
+  ]));
+  await year.selectOption('all');
+  await expect(page.locator('[data-month="2025-01"] .used-pto')).toHaveText('2');
+  await expect(page.locator('[data-month="2026-01"] .used-pto')).toHaveText('3');
+  await nav(page, 'POP');
+  await expect(page.getByLabel('POP year', { exact: true })).toHaveValue('all');
+  await expect(page.locator('.pop-table tbody tr')).toHaveCount(24);
+  expect(await page.locator('.pop-table-scroll').evaluate(el => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+  await page.locator('.pop-table tbody tr').last().scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
+  expect(await page.locator('.pop-table-scroll').evaluate(el => el.scrollTop)).toBe(0);
+  await page.getByLabel('POP year', { exact: true }).selectOption('2026');
+  await expect(page.locator('.pop-table tbody tr')).toHaveCount(5);
+});
+
 test('monthly summary trims zeros, collapses accruals, and edits the five saved totals', async ({ page }) => {
   const state = await backend(page);
   state.report = { ...report, entries: [

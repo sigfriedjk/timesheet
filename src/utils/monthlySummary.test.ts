@@ -1,12 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import { TimeLog } from '../types';
 import { createSampleTimeLogs2026 } from '../services/sampleData';
-import { buildMonthlySummary, createDefaultMonthlyReport } from './monthlySummary';
+import { buildMonthlySummary, createDefaultMonthlyReport, getMonthlySummaryRange } from './monthlySummary';
 
 const log = (date: string, totalHours: number): TimeLog => ({ id: date, date, totalHours, createdAt: `${date}T18:00:00Z`, updatedAt: `${date}T18:00:00Z` });
 const sample = createSampleTimeLogs2026();
 
 describe('Monthly work and leave summary', () => {
+  it('shows a continuous all-years range from every saved input through the forecast horizon', () => {
+    const state = createDefaultMonthlyReport(2025);
+    state.entries = [{ id: 'early-leave', date: '2024-11-10', category: 'pto', hours: 2 }];
+    state.projectedWork = { '2027-03': 100 };
+    const logs = [log('2025-01-02', 8), log('2026-01-02', 7)];
+    expect(getMonthlySummaryRange(logs, state, '2026-10-22')).toEqual({ firstMonth: '2024-11', lastMonth: '2027-12', years: [2024, 2025, 2026, 2027] });
+    const all = buildMonthlySummary(logs, state, 'all', '2026-10-22');
+    expect(all.rows).toHaveLength(38);
+    expect(new Set(all.rows.map(row => row.key)).size).toBe(38);
+    expect(all.rows[0]).toMatchObject({ key: '2024-11', balance: null });
+    expect(all.rows[all.rows.length - 1].key).toBe('2027-12');
+    expect(all.rows.find(row => row.key === '2025-02')?.actualHours).toBe(0);
+    expect(all.totals.actualHours).toBe(15);
+    const current = buildMonthlySummary(logs, state, 2026, '2026-10-22');
+    expect(all.currentBalance).toEqual(current.currentBalance);
+    expect(all.rows.find(row => row.key === '2026-01')).toEqual(current.rows[0]);
+    expect(all.yearEndBalance).toEqual(buildMonthlySummary(logs, state, 2027, '2026-10-22').yearEndBalance);
+  });
+
+  it('includes earlier logs and future leave, and provides a useful range without any entries', () => {
+    const state = createDefaultMonthlyReport(2026);
+    expect(getMonthlySummaryRange([], state, '2026-10-22')).toEqual({ firstMonth: '2026-01', lastMonth: '2026-12', years: [2026] });
+    expect(buildMonthlySummary([], state, 'all', '2026-10-22').rows).toHaveLength(12);
+    state.entries = [{ id: 'future-leave', date: '2028-02-01', category: 'pto', hours: 8 }];
+    expect(getMonthlySummaryRange([log('2025-01-02', 8)], state, '2026-10-22')).toEqual({ firstMonth: '2025-01', lastMonth: '2028-12', years: [2025, 2026, 2027, 2028] });
+  });
+
   it('matches the sheet weekday/credit/PTO formulas without double counting holidays', () => {
     const state = createDefaultMonthlyReport(2026);
     const jan = buildMonthlySummary(sample, state, 2026, '2026-10-20').rows[0];

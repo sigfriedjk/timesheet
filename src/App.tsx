@@ -125,9 +125,9 @@ export const App: React.FC = () => {
             />
           )}
 
-          {workspace.ready && currentTab === 'monthly' && <MonthlySummaryView key={dataset} logs={logs} state={reportState} isSample={dataset === 'sample2026'} onChange={workspace.saveReport} />}
+          {workspace.ready && currentTab === 'monthly' && <MonthlySummaryView key={dataset} logs={logs} state={reportState} onChange={workspace.saveReport} />}
 
-          {workspace.ready && currentTab === 'pop' && <PopSummaryView key={dataset} logs={logs} periods={workspace.periods} isSample={dataset === 'sample2026'} />}
+          {workspace.ready && currentTab === 'pop' && <PopSummaryView key={dataset} logs={logs} periods={workspace.periods} />}
 
           {currentTab === 'settings' && (
             <SettingsView
