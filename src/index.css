@@ -967,6 +967,7 @@ body {
 .summary-stat > strong small { font-size: 0.65rem; font-weight: 500; color: var(--text-muted); }
 .summary-stat > span:not(.summary-label) { font-size: 0.68rem; color: var(--text-muted); }
 .monthly-table-scroll { max-width: 100%; overflow: auto; max-height: 72vh; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+.monthly-view .monthly-table-scroll, .pop-view .monthly-table-scroll { max-height: none; }
 .monthly-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 .monthly-table th, .monthly-table td { padding: 0.65rem 0.6rem; white-space: nowrap; border-right: 1px solid rgba(51, 65, 85, 0.5); border-bottom: 1px solid rgba(51, 65, 85, 0.65); text-align: right; }
 .monthly-table td { font-family: var(--font-mono); }
