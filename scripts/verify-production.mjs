@@ -135,7 +135,7 @@ try {
     } else if (name === 'monthly') {
       const summary = await evaluate(`({ rows: document.querySelectorAll('.monthly-table tbody tr').length, actual: Number(document.querySelector('[data-stat=year-hours]').textContent), forecast: Number(document.querySelector('.monthly-table tfoot tr').children[4].textContent), currentLeave: parseFloat(document.querySelector('[data-stat=current-leave]').textContent), projectedLeave: parseFloat(document.querySelector('[data-stat=year-end-leave]').textContent) })`);
       if (summary.rows !== 12 || summary.actual !== 1210.7 || !(summary.forecast > summary.actual) || !Number.isFinite(summary.currentLeave) || !Number.isFinite(summary.projectedLeave)) throw new Error(`Monthly report failed: ${JSON.stringify(summary)}`);
-      const automaticPto = await evaluate(`({ january: Number(document.querySelector('[data-month="2026-01"]').children[11].textContent), february: Number(document.querySelector('[data-month="2026-02"]').children[11].textContent) })`);
+      const automaticPto = await evaluate(`({ january: Number(document.querySelector('[data-month="2026-01"] .used-pto').textContent), february: Number(document.querySelector('[data-month="2026-02"] .used-pto').textContent) })`);
       if (automaticPto.january !== 17.7 || automaticPto.february !== 152) throw new Error(`Automatic PTO gaps failed: ${JSON.stringify(automaticPto)}`);
       report.pages.push({ name, url, rendered: true, ...summary });
     } else if (name === 'pop') {
