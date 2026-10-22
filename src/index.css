@@ -256,6 +256,7 @@ body {
 .calculator-form .form-input, .calculator-form .form-textarea { min-width: 0; }
 .calculator-form .btn-highlight { white-space: nowrap; }
 .calculator-layout .form-section { align-self: start; }
+.form-section > .card-title { margin-bottom: 1.25rem; }
 @media (max-width: 600px) {
   .calculator-form .form-group { grid-template-columns: 6rem minmax(0, 1fr); column-gap: 0.5rem; }
   .calculator-form .form-label { font-size: 0.8rem; }
@@ -352,11 +353,6 @@ body {
   color: #fff;
 }
 
-.btn-chip.chip-clear {
-  color: var(--danger);
-  border-color: rgba(239, 68, 68, 0.4);
-}
-
 .break-presets {
   display: flex;
   flex-wrap: wrap;
@@ -369,6 +365,7 @@ body {
   padding: 0.4rem 0.5rem;
   font-size: 0.85rem;
 }
+.calculator-form .break-presets .btn-chip { padding: 0.4rem 0.5rem; }
 
 /* Primary Button */
 .btn-primary {
@@ -560,6 +557,15 @@ body {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+.target-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 0.75rem; align-items: end; margin-top: 1rem; }
+.target-field { display: flex; flex-direction: column; min-width: 0; gap: 0.4rem; color: var(--text-muted); font-size: 0.8rem; }
+.target-field > span { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.2rem 0.4rem; }
+.target-field small { font-size: 0.65rem; color: #93c5fd; }
+.target-field .scenario-input[readonly] { color: #cbd5e1; background: #253449; border-style: dashed; }
+.target-direction { height: 3rem; min-width: 2.5rem; display: flex; flex-direction: column; justify-content: center; color: #93c5fd; border-color: #3b82f6; }
+.target-direction:hover { background: #24415d; }
+@media (max-width: 420px) { .target-controls { gap: 0.45rem; } .target-field > span { flex-direction: column; } }
 
 .badge {
   font-size: 0.725rem;
@@ -860,29 +866,6 @@ body {
   }
 }
 
-/* Footer */
-.app-footer {
-  border-top: 1px solid var(--border-subtle);
-  background-color: var(--bg-surface);
-  padding: 1rem 1.5rem;
-  font-size: 0.75rem;
-  color: var(--text-dim);
-}
-
-.footer-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.footer-spec {
-  color: var(--primary);
-  font-family: var(--font-mono);
-}
-
 .btn-chip:disabled {
   opacity: 0.45;
   cursor: default;
@@ -982,6 +965,12 @@ body {
 .monthly-table thead .month-column { z-index: 6 !important; }
 .monthly-table tbody td { background-color: #172236; }
 .monthly-table .projected-row td { background-color: #19273a; }
+.monthly-table .future-month-row td { background-color: #1e3650; border-bottom-color: #3d5d7c; }
+.monthly-table .future-month-row .month-column { background: #24415d; }
+.monthly-table .future-month-row .month-edit small { color: #bfdbfe; font-weight: 600; }
+.monthly-table .current-month-row td, .monthly-table .current-month-row .month-column { background: #493b1e; border-top: 1px solid #b98530; border-bottom: 1px solid #b98530; }
+.monthly-table .current-month-row .month-column { box-shadow: inset 4px 0 #fbbf24; }
+.monthly-table .current-month-row .month-edit, .monthly-table .current-month-row .month-edit small, .monthly-table .current-month-row .projected-value { color: #fde68a; font-weight: 600; }
 .month-edit { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; width: 100%; border: 0; background: none; color: var(--text-main); text-align: left; cursor: pointer; font: inherit; }
 .month-edit small { display: block; color: var(--text-muted); font-size: 0.6rem; font-weight: 400; }
 .projected-row .month-edit small, .monthly-table .projected-value { color: #93c5fd; }

@@ -8,6 +8,7 @@ import {
   normalizeTimeInput,
 } from '../utils/calculations';
 import { TimeLog } from '../types';
+import { formatNumber } from '../utils/format';
 import {
   Clock,
   Coffee,
@@ -15,6 +16,9 @@ import {
   AlertTriangle,
   Calendar as CalendarIcon,
   FileText,
+  ArrowLeft,
+  ArrowRight,
+  LockKeyholeOpen,
 } from 'lucide-react';
 
 interface DailyCalculatorProps {
@@ -35,6 +39,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
   const [targetOutTime, setTargetOutTime] = useState<string>('');
   const [breakMinutes, setBreakMinutes] = useState<number>(0);
   const [targetHoursInput, setTargetHoursInput] = useState<string>('8.5');
+  const [targetMode, setTargetMode] = useState<'hours' | 'time'>('hours');
   const [notes, setNotes] = useState<string>('');
   const [currentTimeStr, setCurrentTimeStr] = useState<string>(getCurrentTimeString());
 
@@ -56,12 +61,18 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
     return calculateWorkedHours(timeIn, timeOut, breakMinutes);
   }, [timeIn, timeOut, breakMinutes]);
   const validShift = timeStringToMinutes(timeIn) !== null && timeStringToMinutes(timeOut) !== null;
-  const validOutTarget = timeStringToMinutes(normalizeTimeInput(targetOutTime)) !== null;
 
   const scenarios = useMemo(
     () => getShiftScenarios(timeIn, currentTimeStr, breakMinutes, targetHoursInput, targetOutTime),
     [timeIn, currentTimeStr, breakMinutes, targetHoursInput, targetOutTime]
   );
+  const displayedTargetTime = targetMode === 'hours' ? scenarios.shift?.timeOut ?? '' : targetOutTime;
+  const displayedTargetHours = targetMode === 'hours' ? targetHoursInput : scenarios.out ? formatNumber(scenarios.out.hours, 1) : '';
+  const validOutTarget = timeStringToMinutes(normalizeTimeInput(displayedTargetTime)) !== null;
+  const switchTargetMode = () => {
+    if (targetMode === 'hours') { setTargetOutTime(displayedTargetTime); setTargetMode('time'); }
+    else { setTargetHoursInput(displayedTargetHours); setTargetMode('hours'); }
+  };
 
   const handleSetTimeInNow = () => {
     setTimeIn(getCurrentTimeString());
@@ -113,7 +124,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
         {/* Left Column: Form Controls */}
         <section className="calculator-card form-section" aria-labelledby="controls-heading">
           <h3 id="controls-heading" className="card-title">
-            Shift Details
+            Today
           </h3>
 
           <form onSubmit={handleLogSubmit} className="calculator-form">
@@ -184,7 +195,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                   required
                 />
                 <button type="button" onClick={handleSetTimeOutNow} className="btn-chip">Now</button>
-                {timeOut && <button type="button" onClick={handleClearTimeOut} className="btn-chip chip-clear">Clear</button>}
+                {timeOut && <button type="button" onClick={handleClearTimeOut} className="btn-chip">Clear</button>}
               </div>
             </div>
 
@@ -195,6 +206,17 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                 <span>Break (min)</span>
               </label>
               <div className="break-presets">
+                <input
+                  id="break-mins"
+                  type="number"
+                  min="0"
+                  max="480"
+                  step="1"
+                  value={breakMinutes}
+                  onChange={(e) => setBreakMinutes(Math.min(480, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+                  className="form-input custom-break-input"
+                  aria-label="Custom break minutes"
+                />
                 {[0, 30, 60].map((mins) => (
                   <button
                     key={mins}
@@ -221,17 +243,6 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                   aria-label="Add 6 minutes (0.1 hour)"
                   title="Add 6 minutes (0.1 hour)"
                 >+</button>
-                <input
-                  id="break-mins"
-                  type="number"
-                  min="0"
-                  max="480"
-                  step="1"
-                  value={breakMinutes}
-                  onChange={(e) => setBreakMinutes(Math.min(480, Math.max(0, parseInt(e.target.value, 10) || 0)))}
-                  className="form-input custom-break-input"
-                  aria-label="Custom break minutes"
-                />
               </div>
             </div>
 
@@ -258,8 +269,8 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                 <div>
                   <strong>Existing Entry Detected:</strong>
                   <p>
-                    {date} currently has <strong>{existingEntry.totalHours.toFixed(1)} hrs</strong> logged.
-                    Saving will overwrite this entry with <strong>{validShift ? workedCalc.roundedHours.toFixed(1) : '—'} hrs</strong>.
+                    {date} currently has <strong>{formatNumber(existingEntry.totalHours, 1)} hrs</strong> logged.
+                    Saving will overwrite this entry with <strong>{validShift ? formatNumber(workedCalc.roundedHours, 1) : '—'} hrs</strong>.
                   </p>
                 </div>
               </div>
@@ -270,7 +281,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
               <button type="submit" className="btn-primary btn-large" disabled={busy}>
                 <CheckCircle2 size={20} />
                 <span>{busy ? 'Saving…' : existingEntry ? 'Overwrite & Log Time' : 'Log Time to Database'}</span>
-                <span className="btn-highlight">({validShift ? workedCalc.roundedHours.toFixed(1) : '—'} hrs)</span>
+                <span className="btn-highlight">({validShift ? formatNumber(workedCalc.roundedHours, 1) : '—'} hrs)</span>
               </button>
 
             </div>
@@ -283,44 +294,24 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
           <ScenarioCard
             title="Live Calculation"
             outTime={<span className="scenario-value">{currentTimeStr}</span>}
-            hours={<span className="scenario-value">{scenarios.live?.hours.toFixed(1) ?? '—'}</span>}
+            hours={<span className="scenario-value">{formatNumber(scenarios.live?.hours, 1)}</span>}
           />
-          <ScenarioCard
-            title="Shift Target"
-            outTime={<span className="scenario-value">{scenarios.shift ? scenarios.shift.timeOut : '—'}</span>}
-            hours={
-              <input
-                id="target-hours-input"
-                type="number"
-                step="0.1"
-                min="0.1"
-                max="24"
-                value={targetHoursInput}
-                onChange={(e) => setTargetHoursInput(e.target.value)}
-                className="scenario-input"
-                aria-label="Target hours"
-                aria-invalid={targetHoursInput !== '' && !scenarios.shift}
-                aria-describedby={!scenarios.shift ? 'target-hours-hint' : undefined}
-              />
-            }
-            hint={!scenarios.shift ? <p id="target-hours-hint" className="scenario-hint">Enter 0.1 to 24 hours and a valid time in.</p> : undefined}
-          />
-          <ScenarioCard
-            title="Out Target"
-            outTime={
-              <TimeInput24
-                id="target-out-time"
-                value={targetOutTime}
-                onValueChange={setTargetOutTime}
-                className="scenario-input"
-                aria-label="Target out time"
-              />
-            }
-            hours={<span className="scenario-value">{scenarios.out?.hours.toFixed(1) ?? '—'}</span>}
-            actions={
-              <button type="button" disabled={busy || !validOutTarget} onClick={() => setTimeOut(normalizeTimeInput(targetOutTime))} className="btn-chip">Use as Time Out</button>
-            }
-          />
+          <section className="calculator-card scenario-card out-target-card" aria-label="Out Target">
+            <h3 className="card-title">Out Target</h3>
+            <div className="target-controls">
+              <label className="target-field" htmlFor="target-hours-input"><span>Hours <small>{targetMode === 'hours' ? 'Editable' : 'Calculated'}</small></span>
+                <input id="target-hours-input" type="number" inputMode="decimal" step="0.1" min="0.1" max="24" value={displayedTargetHours} onChange={event => setTargetHoursInput(event.target.value)} readOnly={targetMode !== 'hours'} disabled={busy} className="scenario-input" aria-label="Target hours" aria-invalid={targetMode === 'hours' && targetHoursInput !== '' && !scenarios.shift} />
+              </label>
+              <button type="button" className="target-direction btn-icon" onClick={switchTargetMode} disabled={busy} aria-label={targetMode === 'hours' ? 'Edit time out and calculate hours' : 'Edit hours and calculate time out'} title={targetMode === 'hours' ? 'Hours editable. Switch to edit time out.' : 'Time out editable. Switch to edit hours.'}>
+                <LockKeyholeOpen size={14} aria-hidden="true" />{targetMode === 'hours' ? <ArrowLeft size={22} aria-hidden="true" /> : <ArrowRight size={22} aria-hidden="true" />}
+              </button>
+              <label className="target-field" htmlFor="target-out-time"><span>Time out <small>{targetMode === 'time' ? 'Editable' : 'Calculated'}</small></span>
+                <TimeInput24 id="target-out-time" value={displayedTargetTime} onValueChange={setTargetOutTime} readOnly={targetMode !== 'time'} disabled={busy} className="scenario-input" aria-label="Target out time" />
+              </label>
+            </div>
+            <div className="scenario-actions"><button type="button" disabled={busy || !validOutTarget} onClick={() => setTimeOut(normalizeTimeInput(displayedTargetTime))} className="btn-chip">Use as Time Out</button></div>
+            {targetMode === 'hours' && !scenarios.shift && <p className="scenario-hint">Enter 0.1 to 24 hours and a valid Time In.</p>}
+          </section>
         </section>
       </div>
     </div>
@@ -331,11 +322,9 @@ interface ScenarioCardProps {
   title: string;
   outTime: React.ReactNode;
   hours: React.ReactNode;
-  actions?: React.ReactNode;
-  hint?: React.ReactNode;
 }
 
-const ScenarioCard: React.FC<ScenarioCardProps> = ({ title, outTime, hours, actions, hint }) => (
+const ScenarioCard: React.FC<ScenarioCardProps> = ({ title, outTime, hours }) => (
   <section className="calculator-card scenario-card" aria-label={title}>
     <h3 className="card-title">{title}</h3>
     <dl className="scenario-pair">
@@ -348,8 +337,6 @@ const ScenarioCard: React.FC<ScenarioCardProps> = ({ title, outTime, hours, acti
         <dd>{hours}</dd>
       </div>
     </dl>
-    {actions && <div className="scenario-actions">{actions}</div>}
-    {hint}
   </section>
 );
 
@@ -361,7 +348,7 @@ const TimeInput24: React.FC<TimeInput24Props> = ({ onValueChange, onBlur, ...pro
     type="text"
     inputMode="numeric"
     onChange={event => onValueChange(event.target.value)}
-    onBlur={event => { onValueChange(normalizeTimeInput(event.currentTarget.value)); onBlur?.(event); }}
+    onBlur={event => { if (!props.readOnly) onValueChange(normalizeTimeInput(event.currentTarget.value)); onBlur?.(event); }}
     placeholder="HH:MM"
     pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]"
     maxLength={5}

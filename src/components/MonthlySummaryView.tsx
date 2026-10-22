@@ -6,13 +6,13 @@ import { MONTH_NAMES, calendarDate } from '../utils/calendar';
 import { generateId } from '../services/storage';
 import { useTodayDate } from '../hooks/useTodayDate';
 import { LEAVE_FIELDS, enteredMonthTotal, setEnteredMonthTotal } from '../utils/monthlyEntries';
+import { formatNumber as fixed } from '../utils/format';
 
 interface Props {
   logs: TimeLog[];
   state: MonthlyReportState;
   onChange: (state: MonthlyReportState) => Promise<void>;
 }
-const fixed = (value: number | null | undefined, digits = 2) => value == null ? '—' : String(Number(value.toFixed(digits)));
 const BalanceDetail: React.FC<{ value: LeaveBalance | null }> = ({ value }) => value
   ? <dl className="leave-breakdown">{(['pto', 'holiday', 'birthday'] as const).map(category => <div key={category}><dt>{category === 'pto' ? 'PTO' : category === 'holiday' ? 'Holiday' : 'Birthday'}</dt><dd data-stat={`leave-${category}`} className={value[category] < 0 ? 'negative-value' : ''}>{fixed(value[category])}<small> h</small></dd></div>)}</dl>
   : <span>Set an opening month and balances in Settings.</span>;
@@ -50,8 +50,8 @@ export const MonthlySummaryView: React.FC<Props> = ({ logs, state, onChange }) =
           <tr><th rowSpan={2} className="month-column" scope="col">Month</th><th colSpan={6} scope="colgroup">Work & trailing 12 months</th>{showAccrued && <th colSpan={3} scope="colgroup" className="accrual-group">Accrued</th>}<th colSpan={4} scope="colgroup" className="usage-group">Used / planned leave</th><th rowSpan={2} scope="col">PTO adj.</th><th colSpan={3} scope="colgroup" className="balance-group">End-of-month balances</th></tr>
           <tr>{['Weekday h', 'Holidays', 'Logged h', 'Work total', '12m total', 'Leave needed', ...(showAccrued ? ['PTO', 'Holiday', 'Birthday'] : []), 'PTO', 'Holiday', 'Birthday', 'Overhead', 'PTO', 'Holiday', 'Birthday'].map((heading, i) => <th key={i} scope="col">{heading}</th>)}</tr>
         </thead>
-        <tbody>{report.rows.map(row => <tr key={row.key} data-month={row.key} className={row.projected ? 'projected-row' : ''}>
-          <th scope="row" className="month-column"><button type="button" className="month-edit" disabled={saving} aria-expanded={editing === row.key} aria-controls={editing === row.key ? 'month-editor' : undefined} onClick={event => editMonth(row.key, event.currentTarget)} aria-label={`Edit ${MONTH_NAMES[row.month]} ${row.year} leave`}><span>{MONTH_NAMES[row.month].slice(0, 3)} {row.year}<small>{row.projected ? 'Projected' : row.actualHours ? 'Logged' : 'No logs'}</small></span><Edit3 size={13} /></button></th>
+        <tbody>{report.rows.map(row => <tr key={row.key} data-month={row.key} aria-current={row.key === asOf.slice(0, 7) ? 'date' : undefined} className={`${row.projected ? 'projected-row ' : ''}${row.key === asOf.slice(0, 7) ? 'current-month-row' : row.key > asOf.slice(0, 7) ? 'future-month-row' : ''}`}>
+          <th scope="row" className="month-column"><button type="button" className="month-edit" disabled={saving} aria-expanded={editing === row.key} aria-controls={editing === row.key ? 'month-editor' : undefined} onClick={event => editMonth(row.key, event.currentTarget)} aria-label={`Edit ${MONTH_NAMES[row.month]} ${row.year} leave`}><span>{MONTH_NAMES[row.month].slice(0, 3)} {row.year}<small>{row.key === asOf.slice(0, 7) ? 'Current month' : row.key > asOf.slice(0, 7) ? 'Forecast' : row.actualHours ? 'Logged' : 'No logs'}</small></span><Edit3 size={13} /></button></th>
           <Cell value={row.weekdayHours} digits={1} /><Cell value={row.holidayCount} digits={0} /><Cell value={row.actualHours} digits={1} />
           <Cell value={row.workHours} digits={1} className={row.projected ? 'projected-value' : ''} title={row.projected ? `${fixed(row.actualHours, 1)} logged + ${fixed(row.remainingHours, 1)} projected` : 'Logged work only'} />
           <Cell value={row.rollingTotal} digits={1} title={`${row.rollingMonths}/12 tracked months`} /><Cell value={row.leaveNeeded} digits={1} />

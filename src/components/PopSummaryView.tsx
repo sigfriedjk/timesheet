@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { PeriodOfPerformance, TimeLog } from '../types';
 import { buildPopSummary } from '../utils/popSummary';
 import { useTodayDate } from '../hooks/useTodayDate';
+import { formatNumber } from '../utils/format';
 
 interface Props { logs: TimeLog[]; periods: PeriodOfPerformance[] }
-const fixed = (value: number | null, digits = 1) => value == null ? '—' : value.toFixed(digits);
+const fixed = (value: number | null, digits = 1) => formatNumber(value, digits);
 
 export const PopSummaryView: React.FC<Props> = ({ logs, periods }) => {
   const years = useMemo(() => Array.from(new Set(periods.flatMap(period => Array.from({ length: Number(period.endDate.slice(0, 4)) - Number(period.startDate.slice(0, 4)) + 1 }, (_, i) => Number(period.startDate.slice(0, 4)) + i)))).sort(), [periods]);
