@@ -3,9 +3,9 @@ import { ChevronDown, ChevronRight, Edit3, X } from 'lucide-react';
 import { LeaveBalance, MonthlyRow, buildMonthlySummary } from '../utils/monthlySummary';
 import { LeaveCategory, MonthlyReportState, TimeLog } from '../types';
 import { MONTH_NAMES, calendarDate } from '../utils/calendar';
-import { getTodayDateString } from '../utils/calculations';
 import { generateId } from '../services/storage';
-import { SAMPLE_END } from '../services/sampleData';
+import { SAMPLE_YEAR } from '../services/sampleData';
+import { useTodayDate } from '../hooks/useTodayDate';
 import { LEAVE_FIELDS, enteredMonthTotal, setEnteredMonthTotal } from '../utils/monthlyEntries';
 
 interface Props {
@@ -13,18 +13,17 @@ interface Props {
   state: MonthlyReportState;
   isSample: boolean;
   onChange: (state: MonthlyReportState) => Promise<void>;
-  onOpenSettings: () => void;
 }
 const fixed = (value: number | null | undefined, digits = 2) => value == null ? '—' : String(Number(value.toFixed(digits)));
 const BalanceDetail: React.FC<{ value: LeaveBalance | null }> = ({ value }) => value
-  ? <span>PTO {fixed(value.pto)} · Holiday {fixed(value.holiday)} · Birthday {fixed(value.birthday)}</span>
+  ? <dl className="leave-breakdown">{(['pto', 'holiday', 'birthday'] as const).map(category => <div key={category}><dt>{category === 'pto' ? 'PTO' : category === 'holiday' ? 'Holiday' : 'Birthday'}</dt><dd data-stat={`leave-${category}`} className={value[category] < 0 ? 'negative-value' : ''}>{fixed(value[category])}<small> h</small></dd></div>)}</dl>
   : <span>Set an opening month and balances in Settings.</span>;
 const Cell: React.FC<{ value: number | null | undefined; digits?: number; className?: string; title?: string }> = ({ value, digits = 2, className = '', title }) =>
   <td className={`${className} ${value != null && value < 0 ? 'negative-value' : ''}`} title={title}>{fixed(value, digits)}</td>;
 
-export const MonthlySummaryView: React.FC<Props> = ({ logs, state, isSample, onChange, onOpenSettings }) => {
-  const [asOf, setAsOf] = useState(isSample ? SAMPLE_END : getTodayDateString());
-  const [year, setYear] = useState(Number(asOf.slice(0, 4)));
+export const MonthlySummaryView: React.FC<Props> = ({ logs, state, isSample, onChange }) => {
+  const asOf = useTodayDate();
+  const [year, setYear] = useState(isSample ? SAMPLE_YEAR : Number(asOf.slice(0, 4)));
   const [editing, setEditing] = useState<string | null>(null);
   const [showAccrued, setShowAccrued] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -34,8 +33,6 @@ export const MonthlySummaryView: React.FC<Props> = ({ logs, state, isSample, onC
   const report = useMemo(() => buildMonthlySummary(logs, state, year, asOf), [logs, state, year, asOf]);
   const t = report.totals;
   const december = report.rows[11];
-  const projectedYear = `${year}-12-31` > asOf;
-  const balanceDate = asOf > `${year}-12-31` ? `${year}-12-31` : asOf;
   return <div className="monthly-view">
     <div className="monthly-toolbar">
       <div className="year-selector" aria-label="Summary year">
@@ -43,14 +40,12 @@ export const MonthlySummaryView: React.FC<Props> = ({ logs, state, isSample, onC
         <strong>{year}</strong>
         <button type="button" className="btn-icon" aria-label="Next summary year" disabled={saving} onClick={() => { setYear(year + 1); setEditing(null); }}>→</button>
       </div>
-      <label className="as-of-control">Actuals through<input type="date" className="form-input" value={asOf} onChange={event => { if (event.target.value) setAsOf(event.target.value); }} /></label>
-      <button type="button" className="btn-secondary" onClick={onOpenSettings}>Leave & forecast settings</button>
       <button type="button" className="btn-secondary accrual-toggle" aria-expanded={showAccrued} aria-controls="monthly-summary-table" onClick={() => setShowAccrued(!showAccrued)}>{showAccrued ? <ChevronDown size={15} /> : <ChevronRight size={15} />}{showAccrued ? 'Hide accrued' : 'Show accrued'}</button>
     </div>
     <div className="monthly-stats">
-      <div className="summary-stat"><span className="summary-label">Logged year hours</span><strong data-stat="year-hours">{fixed(t.actualHours, 1)}</strong><span>Forecast year total: {fixed(t.workHours, 1)} h</span></div>
-      <div className="summary-stat"><span className="summary-label">Leave through {balanceDate}</span><strong data-stat="current-leave" className={(report.currentBalance?.total ?? 0) < 0 ? 'negative-value' : ''}>{fixed(report.currentBalance?.total)} <small>h</small></strong><BalanceDetail value={report.currentBalance} /></div>
-      <div className="summary-stat"><span className="summary-label">{projectedYear ? 'Projected December leave' : 'December leave'}</span><strong data-stat="year-end-leave" className={(report.yearEndBalance?.total ?? 0) < 0 ? 'negative-value' : ''}>{fixed(report.yearEndBalance?.total)} <small>h</small></strong><BalanceDetail value={report.yearEndBalance} /></div>
+      <div className="summary-stat"><span className="summary-label">Logged year hours</span><strong data-stat="year-hours">{fixed(t.actualHours, 1)}</strong></div>
+      <div className="summary-stat"><span className="summary-label">Leave balance</span><BalanceDetail value={report.currentBalance} /></div>
+      <div className="summary-stat"><span className="summary-label">Forecast year total</span><strong data-stat="forecast-year-hours">{fixed(t.workHours, 1)} <small>h</small></strong></div>
     </div>
     {editing && <MonthEditor key={editing} row={report.rows.find(row => row.key === editing)!} asOf={asOf} state={state} onChange={onChange} onClose={closeEditor} onSaving={setSaving} />}
     <div className="monthly-table-scroll" tabIndex={0} aria-label="Monthly work and leave summary; scroll horizontally for all columns">
@@ -75,7 +70,7 @@ export const MonthlySummaryView: React.FC<Props> = ({ logs, state, isSample, onC
     </div>
     <details className="report-rules"><summary>Calculation details</summary>
       <p>Weekday hours include holidays, as in the reference table. Holiday credits are counted once on their observed weekday and granted at the start of the month. Birthday credit is 8 hours in January. PTO accrues at 0.0851 per worked hour.</p>
-      <p>Logged hours stop at the selected cutoff. Remaining work uses {fixed(state.settings.workPercent)}% of 8 hours per non-holiday weekday, less planned leave. Future-dated daily logs replace the estimate for that day. Edit a month to change its entered leave totals and PTO adjustment.</p>
+      <p>Remaining work uses {fixed(state.settings.workPercent)}% of 8 hours per non-holiday weekday, less planned leave. Future-dated daily logs replace the estimate for that day. Edit a month to change its entered leave totals and PTO adjustment.</p>
       <p>Historical PTO gaps are {state.settings.autoPto ? 'automatically filled unless an explicit PTO entry exists' : 'not automatically deducted; only explicit PTO entries reduce the PTO balance'}. Unworked observed holidays default to holiday leave; an explicit holiday entry overrides that portion of the month. Forecasts estimate PTO needed to cover future weekday gaps after other leave.</p>
       <p>Balances start at {state.settings.openingMonth}, carry across years, and may become negative. Earlier balances are unavailable. The 12-month total includes up to 12 tracked months and future estimates for projected rows.</p>
     </details>

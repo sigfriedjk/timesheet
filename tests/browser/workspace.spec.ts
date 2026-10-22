@@ -42,12 +42,15 @@ async function backend(page: Page, signedIn = true) {
     await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
   });
   if (signedIn) await page.addInitScript(({ A }) => {
-    const token = `header.${btoa(JSON.stringify({ sub: A, exp: Math.floor(Date.now() / 1000) + 3600, role: 'authenticated' }))}.test`;
-    localStorage.setItem('sb-yiqquogdutgujsacoezh-auth-token', JSON.stringify({ access_token: token, refresh_token: 'test-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, expires_in: 3600, token_type: 'bearer', user: { id: A, email: 'test@example.invalid', aud: 'authenticated' } }));
+    // Clock-controlled report tests advance across days; keep their mock session valid.
+    const expiresAt = Date.parse('2030-01-01T00:00:00Z') / 1000;
+    const token = `header.${btoa(JSON.stringify({ sub: A, exp: expiresAt, role: 'authenticated' }))}.test`;
+    localStorage.setItem('sb-yiqquogdutgujsacoezh-auth-token', JSON.stringify({ access_token: token, refresh_token: 'test-refresh', expires_at: expiresAt, expires_in: 3600, token_type: 'bearer', user: { id: A, email: 'test@example.invalid', aud: 'authenticated' } }));
   }, { A });
   return state;
 }
 const nav = (page: Page, name: string) => page.locator('.nav-tab-btn').filter({ hasText: name }).click();
+test.beforeEach(async ({ page }) => { await page.clock.install({ time: new Date('2026-10-22T12:00:00') }); });
 
 test('Settings exposes JSON controls while signed out and explains when old browser data is absent', async ({ page }) => {
   await backend(page, false);
@@ -198,7 +201,54 @@ test('recovers auth, loads cloud records, preserves failed calculator draft and 
   await page.getByRole('button', { name: /Log Time to Database/ }).click();
   await expect(page.getByRole('button', { name: /Saving/ })).toBeDisabled();
   await expect(page.locator('.calendar-logged')).toHaveCount(2);
-  expect(state.logs.find(item => item.date === '2026-10-21')?.total_hours).toBe(8.5);
+  expect(state.logs.find(item => item.date === '2026-10-21')?.total_hours).toBe(9);
+});
+
+for (const width of [390, 1280]) test(`calculator aligns labels and normalizes required shift times at ${width}px`, async ({ page }) => {
+  const state = await backend(page);
+  await page.setViewportSize({ width, height: 1000 });
+  await page.goto('/?view=calculator');
+  const shift = page.getByRole('region', { name: 'Shift Details' });
+  const target = page.getByRole('region', { name: 'Out Target' });
+  await expect(shift.getByLabel('Custom break minutes', { exact: true })).toHaveValue('0');
+  await expect(shift.getByLabel('Time out', { exact: true })).toHaveAttribute('required', '');
+  await expect(shift).not.toContainText(/Time Out \(Optional\)|Leave blank to log through/);
+  await shift.getByRole('button', { name: /Log Time to Database/ }).click();
+  expect(state.requests.filter(request => request.path.endsWith('/timesheet_logs') && request.method === 'POST')).toHaveLength(0);
+  await expect(shift.getByLabel('Time out', { exact: true })).toHaveValue('');
+  await expect(target.getByRole('button', { name: /Now|Clear/ })).toHaveCount(0);
+  const copy = target.getByRole('button', { name: 'Use as Time Out', exact: true });
+  await expect(copy).toBeDisabled();
+  const start = shift.getByLabel('Time in', { exact: true });
+  await start.fill('1025');
+  await start.blur();
+  await expect(start).toHaveValue('10:25');
+  const out = shift.getByLabel('Time out', { exact: true });
+  await out.fill('1100');
+  await out.blur();
+  await expect(out).toHaveValue('11:00');
+  const desired = target.getByLabel('Target out time', { exact: true });
+  await desired.fill('2460');
+  await desired.blur();
+  await expect(desired).toHaveValue('2460');
+  await expect(desired).toHaveAttribute('aria-invalid', 'true');
+  await expect(copy).toBeDisabled();
+  await desired.fill('1830');
+  await desired.blur();
+  await expect(desired).toHaveValue('18:30');
+  await copy.click();
+  await expect(out).toHaveValue('18:30');
+  await expect(shift.getByRole('button', { name: /Log Time to Database/ })).toContainText('8.1 hrs');
+  for (const id of ['log-date', 'time-in', 'time-out', 'break-mins', 'log-notes']) {
+    const label = await shift.locator(`label[for="${id}"]`).boundingBox();
+    const input = await shift.locator(`#${id}`).boundingBox();
+    expect(label!.x + label!.width).toBeLessThanOrEqual(input!.x);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `work/calculator-${width}.png`, fullPage: true });
+  await shift.getByRole('button', { name: /Log Time to Database/ }).click();
+  await expect(page.locator('.calendar-logged')).toHaveCount(2);
+  expect(state.logs.find(log => log.date === '2026-10-22')?.total_hours).toBe(8.1);
 });
 
 test('day editor stays open on failure and closes after an acknowledged save; delete updates cloud', async ({ page }) => {
@@ -228,8 +278,8 @@ test('monthly summary trims zeros, collapses accruals, and edits the five saved 
     { id: 'birthday', date: '2026-10-01', category: 'birthday', hours: 8.11 },
     { id: 'other-month', date: '2026-09-01', category: 'pto', hours: 4 },
   ], projectedWork: { '2026-11': 123.4 } };
+  await page.clock.setFixedTime(new Date('2026-10-31T12:00:00'));
   await page.goto('/?view=monthly');
-  await page.getByLabel('Actuals through').fill('2026-12-31');
   const table = page.locator('.monthly-table');
   await expect(table.getByRole('columnheader', { name: '12m avg', exact: true })).toHaveCount(0);
   await expect(page.locator('[data-stat=rolling-average]')).toHaveCount(0);
@@ -271,6 +321,41 @@ test('monthly summary trims zeros, collapses accruals, and edits the five saved 
   await editor.getByRole('button', { name: 'Cancel', exact: true }).click();
   await page.getByRole('button', { name: 'Edit October 2026 leave', exact: true }).click();
   await expect(editor.getByLabel('PTO entered', { exact: true })).toHaveValue('8');
+});
+
+test('summary cards use today automatically, refresh at midnight, and keep forecasts separate', async ({ page }) => {
+  const state = await backend(page);
+  state.logs = [entry('2026-10-21', 7), entry('2026-10-22', 8), entry('2026-10-23', 9)];
+  state.report = { ...report, settings: { ...report.settings, openingMonth: '2026-10', openingPto: 10, openingHoliday: 20, openingBirthday: 30, autoPto: false }, entries: [
+    { id: 'pto', date: '2026-10-22', category: 'pto', hours: 2 },
+    { id: 'holiday', date: '2026-10-22', category: 'holiday', hours: 3 },
+    { id: 'birthday', date: '2026-10-22', category: 'birthday', hours: 4 },
+    { id: 'adjustment', date: '2026-10-22', category: 'adjustment', hours: 1 },
+    { id: 'future', date: '2026-10-23', category: 'pto', hours: 6 },
+  ] };
+  await page.clock.pauseAt(new Date('2026-10-22T23:59:59'));
+  await page.goto('/?view=monthly');
+  await expect(page.locator('[data-stat=year-hours]')).toHaveText('15');
+  await expect(page.locator('[data-stat=year-hours]').locator('..')).not.toContainText('Forecast');
+  await expect(page.locator('.monthly-stats .summary-stat')).toHaveCount(3);
+  await expect(page.locator('[data-stat=forecast-year-hours]')).toBeVisible();
+  const forecast = parseFloat((await page.locator('[data-stat=forecast-year-hours]').textContent())!);
+  expect(forecast).toBeGreaterThan(15);
+  await expect(page.locator('[data-stat=leave-pto]')).toHaveText('10.28 h');
+  await expect(page.locator('[data-stat=leave-holiday]')).toHaveText('25 h');
+  await expect(page.locator('[data-stat=leave-birthday]')).toHaveText('26 h');
+  await expect(page.locator('[data-stat=current-leave], [data-stat=year-end-leave]')).toHaveCount(0);
+  await expect(page.locator('.monthly-view')).not.toContainText(/Leave through|Actuals through|December leave/);
+  await expect(page.locator('.monthly-view input[type=date]')).toHaveCount(0);
+  await expect(page.locator('main').getByRole('button', { name: /settings/i })).toHaveCount(0);
+  await page.clock.runFor(1000);
+  await expect(page.locator('[data-stat=year-hours]')).toHaveText('24');
+  await nav(page, 'POP');
+  await expect(page.locator('[data-stat=pop-worked]')).toHaveText('24.0');
+  await expect(page.locator('.pop-view input[type=date]')).toHaveCount(0);
+  await expect(page.locator('main').getByRole('button', { name: /settings/i })).toHaveCount(0);
+  await nav(page, 'Calculator');
+  await expect(page.locator('main').getByRole('button', { name: /settings/i })).toHaveCount(0);
 });
 
 test('monthly editor separates automatic leave from saved zero and clearing restores inference', async ({ page }) => {

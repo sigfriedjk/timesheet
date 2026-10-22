@@ -35,6 +35,19 @@ export function timeStringToMinutes(timeStr: string): number | null {
   return hours * 60 + minutes;
 }
 
+/** Accept compact 24-hour typing on blur without converting invalid times. */
+export function normalizeTimeInput(value: string): string {
+  const trimmed = value.trim();
+  let candidate = trimmed;
+  if (/^\d{3,4}$/.test(trimmed)) {
+    const digits = trimmed.padStart(4, '0');
+    candidate = `${digits.slice(0, 2)}:${digits.slice(2)}`;
+  } else if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+    candidate = trimmed.padStart(5, '0');
+  }
+  return timeStringToMinutes(candidate) === null ? trimmed : candidate;
+}
+
 /**
  * Formats total minutes from midnight into a 24-hour "HH:MM" string.
  */

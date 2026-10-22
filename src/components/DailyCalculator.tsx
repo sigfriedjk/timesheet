@@ -5,6 +5,7 @@ import {
   timeStringToMinutes,
   getTodayDateString,
   getCurrentTimeString,
+  normalizeTimeInput,
 } from '../utils/calculations';
 import { TimeLog } from '../types';
 import {
@@ -32,7 +33,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
   const [timeIn, setTimeIn] = useState<string>('08:00');
   const [timeOut, setTimeOut] = useState<string>('');
   const [targetOutTime, setTargetOutTime] = useState<string>('');
-  const [breakMinutes, setBreakMinutes] = useState<number>(30);
+  const [breakMinutes, setBreakMinutes] = useState<number>(0);
   const [targetHoursInput, setTargetHoursInput] = useState<string>('8.5');
   const [notes, setNotes] = useState<string>('');
   const [currentTimeStr, setCurrentTimeStr] = useState<string>(getCurrentTimeString());
@@ -50,13 +51,12 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
     return existingLogs.find((l) => l.date === date);
   }, [existingLogs, date]);
 
-  // Effective end time: entered timeOut or current clock time
-  const effectiveTimeOut = timeOut.trim() !== '' ? timeOut : currentTimeStr;
-
   // Worked hours calculation
   const workedCalc = useMemo(() => {
-    return calculateWorkedHours(timeIn, effectiveTimeOut, breakMinutes);
-  }, [timeIn, effectiveTimeOut, breakMinutes]);
+    return calculateWorkedHours(timeIn, timeOut, breakMinutes);
+  }, [timeIn, timeOut, breakMinutes]);
+  const validShift = timeStringToMinutes(timeIn) !== null && timeStringToMinutes(timeOut) !== null;
+  const validOutTarget = timeStringToMinutes(normalizeTimeInput(targetOutTime)) !== null;
 
   const scenarios = useMemo(
     () => getShiftScenarios(timeIn, currentTimeStr, breakMinutes, targetHoursInput, targetOutTime),
@@ -77,7 +77,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
 
   const handleLogSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (busy) return;
+    if (busy || !validShift) return;
     setBusy(true); setError('');
     try {
       await onLogSaved(
@@ -145,17 +145,15 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
 
             {/* Time In */}
             <div className="form-group">
-              <div className="label-row">
-                <label htmlFor="time-in" className="form-label">
-                  <Clock size={16} />
-                  <span>Time In</span>
-                </label>
-              </div>
+              <label htmlFor="time-in" className="form-label">
+                <Clock size={16} />
+                <span>Time In</span>
+              </label>
               <div className="input-with-actions">
                 <TimeInput24
                   id="time-in"
                   value={timeIn}
-                  onChange={(e) => setTimeIn(e.target.value)}
+                  onValueChange={setTimeIn}
                   className="form-input"
                   required
                   aria-label="Time in"
@@ -174,32 +172,28 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
             <div className="form-group">
               <label htmlFor="time-out" className="form-label">
                 <Clock size={16} />
-                <span>Time Out (Optional)</span>
+                <span>Time Out</span>
               </label>
               <div className="input-with-actions">
                 <TimeInput24
                   id="time-out"
                   value={timeOut}
-                  onChange={(e) => setTimeOut(e.target.value)}
+                  onValueChange={setTimeOut}
                   className="form-input"
                   aria-label="Time out"
-                  aria-describedby="time-out-hint"
+                  required
                 />
                 <button type="button" onClick={handleSetTimeOutNow} className="btn-chip">Now</button>
                 {timeOut && <button type="button" onClick={handleClearTimeOut} className="btn-chip chip-clear">Clear</button>}
               </div>
-              <small id="time-out-hint" className="label-help">Leave blank to log through the current time.</small>
             </div>
 
             {/* Break Duration (Minutes) */}
             <div className="form-group">
-              <div className="label-row">
-                <label htmlFor="break-mins" className="form-label">
-                  <Coffee size={16} />
-                  <span>Break / Lunch Duration</span>
-                </label>
-                <span className="label-badge">{(breakMinutes / 60).toFixed(1)} hr · {breakMinutes} min</span>
-              </div>
+              <label htmlFor="break-mins" className="form-label">
+                <Coffee size={16} />
+                <span>Break (min)</span>
+              </label>
               <div className="break-presets">
                 {[0, 30, 60].map((mins) => (
                   <button
@@ -208,7 +202,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                     onClick={() => setBreakMinutes(mins)}
                     className={`btn-chip ${breakMinutes === mins ? 'chip-active' : ''}`}
                   >
-                    {mins === 0 ? 'No Break' : `${(mins / 60).toFixed(1)} hr (${mins}m)`}
+                    {mins} min
                   </button>
                 ))}
                 <button
@@ -265,7 +259,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                   <strong>Existing Entry Detected:</strong>
                   <p>
                     {date} currently has <strong>{existingEntry.totalHours.toFixed(1)} hrs</strong> logged.
-                    Saving will overwrite this entry with <strong>{workedCalc.roundedHours.toFixed(1)} hrs</strong>.
+                    Saving will overwrite this entry with <strong>{validShift ? workedCalc.roundedHours.toFixed(1) : '—'} hrs</strong>.
                   </p>
                 </div>
               </div>
@@ -276,7 +270,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
               <button type="submit" className="btn-primary btn-large" disabled={busy}>
                 <CheckCircle2 size={20} />
                 <span>{busy ? 'Saving…' : existingEntry ? 'Overwrite & Log Time' : 'Log Time to Database'}</span>
-                <span className="btn-highlight">({workedCalc.roundedHours.toFixed(1)} hrs)</span>
+                <span className="btn-highlight">({validShift ? workedCalc.roundedHours.toFixed(1) : '—'} hrs)</span>
               </button>
 
             </div>
@@ -317,17 +311,14 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
               <TimeInput24
                 id="target-out-time"
                 value={targetOutTime}
-                onChange={(e) => setTargetOutTime(e.target.value)}
+                onValueChange={setTargetOutTime}
                 className="scenario-input"
                 aria-label="Target out time"
               />
             }
             hours={<span className="scenario-value">{scenarios.out?.hours.toFixed(1) ?? '—'}</span>}
             actions={
-              <>
-                <button type="button" onClick={() => setTargetOutTime(getCurrentTimeString())} className="btn-chip">Now</button>
-                {targetOutTime && <button type="button" onClick={() => setTargetOutTime('')} className="btn-chip chip-clear">Clear</button>}
-              </>
+              <button type="button" disabled={busy || !validOutTarget} onClick={() => setTimeOut(normalizeTimeInput(targetOutTime))} className="btn-chip">Use as Time Out</button>
             }
           />
         </section>
@@ -363,10 +354,14 @@ const ScenarioCard: React.FC<ScenarioCardProps> = ({ title, outTime, hours, acti
 );
 
 // Text inputs keep HH:MM visible regardless of the browser's time-picker locale.
-const TimeInput24: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (props) => (
+type TimeInput24Props = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> & { onValueChange: (value: string) => void };
+const TimeInput24: React.FC<TimeInput24Props> = ({ onValueChange, onBlur, ...props }) => (
   <input
     {...props}
     type="text"
+    inputMode="numeric"
+    onChange={event => onValueChange(event.target.value)}
+    onBlur={event => { onValueChange(normalizeTimeInput(event.currentTarget.value)); onBlur?.(event); }}
     placeholder="HH:MM"
     pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]"
     maxLength={5}

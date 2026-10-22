@@ -15,8 +15,8 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
 ## Implemented Features
 
 1. **Daily Calculator & Shift Projections (Interface 1):**
-   * **Ephemeral Inputs:** In-memory calculation for `Date`, `Time In`, `Time Out` (optional), and `Break Duration (mins)`.
-   * **Real-Time Live Projections:** Calculates current elapsed hours dynamically using the live clock if Time Out is blank ("*If you leave now, you will have X.X hours*").
+   * **Ephemeral Inputs:** In-memory calculation for `Date`, `Time In`, `Time Out` (required), and `Break Duration (mins)`, which defaults to zero. Shift labels sit beside their fields; compact time entries such as `1025` normalize to `10:25` on blur.
+   * **Real-Time Live Projections:** The Live Calculation card shows elapsed work using the current clock. Saving a shift requires its entered Time Out. The Out Target card’s **Use as Time Out** button copies its time into Shift Details.
    * **Shift Target Cards:** Instant forecasting for:
      * **8.0 hours** (Standard Shift)
      * **9.6 hours** (9/80 Long Shift)
@@ -38,7 +38,7 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
 
 3. **Monthly Work & Leave Summary:**
    * A 12-row year table with actual work, remaining work forecasts, trailing 12-month totals, collapsible accrued leave, used/planned leave, and separate PTO/holiday/birthday balances. Numbers omit trailing decimal zeros.
-   * An explicit actuals cutoff keeps future logs and projected work separate from recorded hours. Monthly work overrides and dated planned leave recalculate forecasts without changing daily logs.
+   * Today’s date keeps future logs and projected work separate from recorded hours. Monthly work overrides and dated planned leave recalculate forecasts without changing daily logs.
    * **Settings → Leave & forecasts** configures opening balances/month, future work rate (94.3% by default), and historical PTO gap-filling (enabled by default). Birthday credit is always in January. Historical and forecast PTO cover weekday shortfalls after work and other leave, including empty months.
    * Work-hour and leave precision remain 0.1 and 0.01 hours respectively. Weekday hours in this table include holidays; holiday credits are tracked separately, following the reference workbook's structure.
    * Up to 12 tracked months are used for rolling averages, including empty tracked months as zero. Partial windows are labeled; the top rolling average uses completed months.
@@ -46,7 +46,7 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
 4. **POP Summary:**
    * A table modeled on the reference POP report: weekdays, weekday hours, funded hours, funded percentage, worked hours, and signed funded-minus-worked hours, with totals.
    * Settings lets you add, edit, and delete POP names, inclusive date ranges, and funded hours. Each account and the separate sample workspace starts with 24 defaults, POP A–X; changes are isolated to the selected workspace and included in backups.
-   * Filter by overlapping year or show all periods. Cross-year POPs retain their complete ranges and funding. An actuals cutoff excludes future logs; weekend and holiday work still counts.
+   * Filter by overlapping year or show all periods. Cross-year POPs retain their complete ranges and funding. Today’s date excludes future logs; weekend and holiday work still counts.
 
 5. **Domain Types & Architectural Scaffolding:**
    * Fully typed domain entities (`TimeLog`, `PeriodOfPerformance`, `LeaveAdjustment`).
@@ -163,11 +163,11 @@ Outputs static production assets to `./dist/`, ready for direct deployment to Gi
 
 ## Monthly Summary Workflow
 
-Open the Monthly Summary tab or use `?view=monthly` (`?sample=2026&view=monthly` for the sample workspace). Set **Actuals through** to the date through which logs and leave usage are considered actual. The sample defaults to October 20, 2026.
+Open the Monthly Summary tab or use `?view=monthly` (`?sample=2026&view=monthly` for the sample workspace). Monthly and POP summaries automatically use the current local date for actual work and leave, including in sample mode. Open reports refresh at midnight and when returning to the tab. The cards show logged year hours, separate PTO/holiday/birthday balances, and forecast year hours.
 
 Opening balances default to zero at January of the current year (January 2026 for the sample). Enter the correct starting PTO, holiday, and birthday balances in Settings. Balances carry across years; the report shows unavailable balances before the configured opening month.
 
-Click a month’s pencil to open a compact inline form for its saved PTO, holiday, birthday, overhead, and signed PTO adjustment totals. These fields exclude automatic estimates. Blank clears that month/category’s entered values; an explicit zero is saved and overrides automatic historical PTO/holiday inference. Changes retain existing dated records and notes where possible; increases use the actuals cutoff for the current month, month-end for completed months, or the first day for future months. Existing work-forecast overrides remain in the data. Use **Show accrued / Hide accrued** to toggle the three accrual columns. Resetting sample data resets only the sample report settings/leave entries/forecasts.
+Click a month’s pencil to open a compact inline form for its saved PTO, holiday, birthday, overhead, and signed PTO adjustment totals. These fields exclude automatic estimates. Blank clears that month/category’s entered values; an explicit zero is saved and overrides automatic historical PTO/holiday inference. Changes retain existing dated records and notes where possible; increases use today’s date for the current month, month-end for completed months, or the first day for future months. Existing work-forecast overrides remain in the data. Use **Show accrued / Hide accrued** to toggle the three accrual columns. Resetting sample data resets only the sample report settings/leave entries/forecasts.
 
 US federal credits are counted on observed weekdays to avoid double credit for actual and observed dates. Unworked observed holidays default to holiday usage; explicit holiday entries override that month's actual/planned portion. PTO earns 0.0851 hours per worked hour, holiday credits are granted at the start of their month, and birthday credit is 8 hours at the start of the configured month. Historical PTO automatically fills weekday gaps after work and other leave, including empty months. Explicit PTO entries (including zero) override the automatic amount. Existing report settings are migrated once to enable this policy while retaining balances, entries, and forecasts; later opt-outs in Settings persist. Forecast PTO covers future weekday shortfalls after other leave; balances can be negative.
 
@@ -175,4 +175,4 @@ US federal credits are counted on observed weekdays to avoid double credit for a
 
 Open `?view=pop` or `?sample=2026&view=pop`. Fixed POP definitions live in `src/config/periodsOfPerformance.ts` and appear in **Settings → Periods of performance**. The 24 periods span April 25, 2024 through June 30, 2027, including mid-month and cross-year boundaries. Names are generic POP A–X; original aliases and the workbook's worked-hour amounts are not imported. Dates and funded amounts are hardcoded for now; editing periods in the interface is deferred.
 
-The year filter selects full periods overlapping the selected year. Weekday hours include holidays, matching the reference: Monday–Friday days × 8. Funded percentage is funded hours divided by weekday hours; totals use a weighted percentage. Worked hours sum daily logs within the inclusive range through the actuals cutoff, including weekend and holiday shifts. Future logs and work projections are excluded. Funded-minus-worked hours remain signed so overruns are visible. Sample data through October 20, 2026 yields 1,915.0 funded hours, 1,210.7 worked hours, and 704.3 hours remaining across five 2026 POPs.
+The year filter selects full periods overlapping the selected year. Weekday hours include holidays, matching the reference: Monday–Friday days × 8. Funded percentage is funded hours divided by weekday hours; totals use a weighted percentage. Worked hours sum daily logs within the inclusive range through today, including weekend and holiday shifts. Future logs and work projections are excluded. Funded-minus-worked hours remain signed so overruns are visible. Sample data through October 20, 2026 yields 1,915.0 funded hours, 1,210.7 worked hours, and 704.3 hours remaining across five 2026 POPs.
