@@ -21,12 +21,13 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
 describe('Supabase repository through the real SDK', () => {
   it('pages long histories and scopes every read to the current user', async () => {
     const report = createDefaultMonthlyReport(); report.settings.autoPto = false;
-    const { repository, requests } = setup(url => url.pathname.endsWith('timesheet_reports') ? json({ state: report }) : json(Array.from({ length: url.searchParams.get('offset') === '0' ? 500 : 2 }, () => row('2026-10-21'))));
+    const { repository, requests } = setup(url => url.pathname.endsWith('timesheet_pop_settings') ? json(null) : url.pathname.endsWith('timesheet_reports') ? json({ state: report }) : json(Array.from({ length: url.searchParams.get('offset') === '0' ? 500 : 2 }, () => row('2026-10-21'))));
     const result = await repository.load();
     expect(result.logs).toHaveLength(502);
     expect(result.logs[0]).toMatchObject({ totalHours: 8.5, notes: undefined });
     expect(result.report.settings.autoPto).toBe(false);
-    expect(requests).toHaveLength(3);
+    expect(requests).toHaveLength(4);
+    expect(result.periods).toHaveLength(24);
     expect(requests.every(({ url }) => url.searchParams.get('user_id') === 'eq.user-a')).toBe(true);
     expect(requests[1].url.searchParams.get('offset')).toBe('500');
     expect(requests[0].url.searchParams.get('order')).toBe('date.desc');
@@ -68,5 +69,16 @@ describe('Supabase repository through the real SDK', () => {
     expect(normalizeMonthlyReport(old).settings.autoPto).toBe(true);
     expect(normalizeMonthlyReport({ ...old, ptoPolicyVersion: 1 }).settings.autoPto).toBe(false);
     expect(normalizeMonthlyReport(null).entries).toEqual([]);
+    const withCalculatedData = { ...old, monthlyBalances: { pto: 123 }, settings: { ...old.settings, birthdayMonth: 5 } };
+    expect(normalizeMonthlyReport(withCalculatedData)).not.toHaveProperty('monthlyBalances');
+    expect(normalizeMonthlyReport(withCalculatedData).settings).not.toHaveProperty('birthdayMonth');
+  });
+  it('restores all saved inputs in one RPC and preserves an explicitly empty POP list on load', async () => {
+    const report = createDefaultMonthlyReport();
+    const { repository, requests } = setup(url => url.pathname.includes('/rpc/') ? json(0) : url.pathname.endsWith('timesheet_reports') ? json({ state: report }) : url.pathname.endsWith('timesheet_pop_settings') ? json({ periods: [] }) : json([]));
+    expect(await repository.replaceWorkspace([], report, [])).toBe(0);
+    expect(requests[0].url.pathname).toBe('/rest/v1/rpc/replace_timesheet_workspace');
+    expect(JSON.parse(requests[0].init.body as string)).toEqual({ p_logs: [], p_report: report, p_periods: [] });
+    expect((await repository.load()).periods).toEqual([]);
   });
 });

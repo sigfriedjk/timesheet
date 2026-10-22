@@ -4,7 +4,7 @@ import { LeaveSettings } from '../types';
 import { LeavePolicyForm } from './LeavePolicyForm';
 import { MONTH_NAMES } from '../utils/calendar';
 import { SAMPLE_MONTH_NOTES, createSampleTimeLogs2026, sampleDataCsv } from '../services/sampleData';
-import { POP_PERIODS } from '../config/periodsOfPerformance';
+import { PopSettings } from './PopSettings';
 import { SupabaseSettings } from './SupabaseSettings';
 import { SupabaseConnection } from '../hooks/useSupabaseConnection';
 import { Workspace } from '../hooks/useWorkspace';
@@ -39,16 +39,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isSample, leaveSetti
       <div className="view-header"><h2>Settings</h2></div>
       <SupabaseSettings connection={connection} workspace={workspace} isSample={isSample} />
       <DataTransferSettings workspace={workspace} isSample={isSample} />
-      <section className="calculator-card pop-settings" aria-labelledby="pop-settings-title">
-        <h3 id="pop-settings-title" className="card-title">Periods of performance</h3>
-        <p className="settings-description">These 24 POP ranges and funded hours are fixed for now and shared by both data sources. Start and end dates are inclusive.</p>
-        <div className="monthly-table-scroll pop-settings-scroll" tabIndex={0} aria-label="Fixed POP ranges and funded hours">
-          <table className="monthly-table pop-settings-table">
-            <thead><tr><th scope="col" className="month-column">POP</th><th scope="col">Start date</th><th scope="col">End date</th><th scope="col">Funded hours</th></tr></thead>
-            <tbody>{POP_PERIODS.map(period => <tr key={period.id} data-period={period.id}><th scope="row" className="month-column">{period.name}</th><td><time dateTime={period.startDate}>{period.startDate}</time></td><td><time dateTime={period.endDate}>{period.endDate}</time></td><td>{period.targetHours.toFixed(1)}</td></tr>)}</tbody>
-          </table>
-        </div>
-      </section>
+      <PopSettings workspace={workspace} />
       {workspace.ready && <LeavePolicyForm key={isSample ? 'sample' : connection.session?.user.id} settings={leaveSettings} onSave={onSaveLeaveSettings} />}
       <section className="calculator-card sample-settings" aria-labelledby="sample-settings-title">
         <h3 id="sample-settings-title" className="card-title">Data source</h3>

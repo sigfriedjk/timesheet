@@ -1,18 +1,18 @@
-import React, { useMemo, useState } from 'react';
-import { TimeLog } from '../types';
-import { POP_PERIODS } from '../config/periodsOfPerformance';
+import React, { useEffect, useMemo, useState } from 'react';
+import { PeriodOfPerformance, TimeLog } from '../types';
 import { buildPopSummary } from '../utils/popSummary';
 import { getTodayDateString } from '../utils/calculations';
 import { SAMPLE_END } from '../services/sampleData';
 
-interface Props { logs: TimeLog[]; isSample: boolean; onOpenSettings: () => void }
+interface Props { logs: TimeLog[]; periods: PeriodOfPerformance[]; isSample: boolean; onOpenSettings: () => void }
 const fixed = (value: number | null, digits = 1) => value == null ? '—' : value.toFixed(digits);
-const years = Array.from(new Set(POP_PERIODS.flatMap(period => Array.from({ length: Number(period.endDate.slice(0, 4)) - Number(period.startDate.slice(0, 4)) + 1 }, (_, i) => Number(period.startDate.slice(0, 4)) + i)))).sort();
 
-export const PopSummaryView: React.FC<Props> = ({ logs, isSample, onOpenSettings }) => {
+export const PopSummaryView: React.FC<Props> = ({ logs, periods, isSample, onOpenSettings }) => {
+  const years = useMemo(() => Array.from(new Set(periods.flatMap(period => Array.from({ length: Number(period.endDate.slice(0, 4)) - Number(period.startDate.slice(0, 4)) + 1 }, (_, i) => Number(period.startDate.slice(0, 4)) + i)))).sort(), [periods]);
   const [asOf, setAsOf] = useState(isSample ? SAMPLE_END : getTodayDateString());
   const [year, setYear] = useState(() => years.includes(Number(asOf.slice(0, 4))) ? asOf.slice(0, 4) : 'all');
-  const report = useMemo(() => buildPopSummary(logs, POP_PERIODS, asOf, year === 'all' ? undefined : Number(year)), [logs, asOf, year]);
+  useEffect(() => { if (year !== 'all' && !years.includes(Number(year))) setYear('all'); }, [year, years]);
+  const report = useMemo(() => buildPopSummary(logs, periods, asOf, year === 'all' ? undefined : Number(year)), [logs, periods, asOf, year]);
   const t = report.totals;
   return <div className="pop-view">
     <div className="monthly-toolbar">
@@ -37,7 +37,7 @@ export const PopSummaryView: React.FC<Props> = ({ logs, isSample, onOpenSettings
       </table>
     </div>
     <details className="report-rules"><summary>Calculation details</summary>
-      <p>Ranges include both start and end dates. The year filter includes each full POP that overlaps that year; it does not split periods at December 31. Fixed dates and funded hours are listed in Settings.</p>
+      <p>Ranges include both start and end dates. The year filter includes each full POP that overlaps that year; it does not split periods at December 31. Edit POP names, dates, and funded hours in Settings.</p>
       <p>Weekday hours = Monday–Friday days × 8, including holidays. Funded % = funded hours ÷ weekday hours. Worked hours include all logged work in the range through the selected cutoff, including weekends and holidays. Future logs and estimates are excluded.</p>
       <p>Funded − worked stays signed: a negative value means work exceeds funding. The total funded percentage uses total funded hours divided by total weekday hours.</p>
     </details>

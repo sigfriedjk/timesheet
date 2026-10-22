@@ -18,14 +18,13 @@ export const DataTransferSettings: React.FC<{ workspace: Workspace; isSample: bo
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
   const selection = useRef(0);
   const dataset = isSample ? 'sample2026' : 'personal';
   const disabled = reading || busy || workspace.busy || !workspace.ready;
   const legacy = isSample ? [] : getAllTimeLogs();
   const legacyReport = isSample ? null : getLegacyReport();
   const hasLegacy = legacy.length > 0 || legacyReport !== null;
-  const existingDates = new Set(workspace.logs.map(log => log.date));
-  const missing = file?.backup.logs.filter(log => !existingDates.has(log.date)).length ?? 0;
   const run = async (action: () => Promise<void>) => {
     setBusy(true); setStatus(''); setError('');
     try { await action(); } catch (error) { setError(error instanceof Error ? error.message : 'The request could not be completed.'); }
@@ -33,19 +32,19 @@ export const DataTransferSettings: React.FC<{ workspace: Workspace; isSample: bo
   };
   return <section className="calculator-card data-transfer-settings" aria-labelledby="data-transfer-title">
     <h3 id="data-transfer-title" className="card-title">Import & export JSON</h3>
-    <p className="settings-description">Export your current {isSample ? 'sample' : 'personal'} timesheet entries, leave settings, and forecasts as a JSON backup. Import a backup or an older JSON array of time entries.</p>
+    <p className="settings-description">Back up all saved inputs: time entries and notes, POP names/dates/funding, monthly PTO/Holiday/Birthday/Overhead/PTO adjustments, opening balances, and forecast settings. Monthly balances are recalculated; birthday credit is always in January.</p>
     {!workspace.ready && <p role="note">{isSample ? 'Wait for sample data to load.' : 'Sign in and load My data to import or export your Supabase timesheet.'}</p>}
     <div className="sample-actions">
       <button type="button" className="btn-secondary" disabled={disabled} onClick={() => void run(async () => {
-        downloadJson(`timesheet-${dataset}-${new Date().toISOString().slice(0, 10)}.json`, exportTimesheetJson(workspace.logs, workspace.report, dataset));
-        setStatus(`Exported ${workspace.logs.length} entries and leave settings.`);
+        downloadJson(`timesheet-${dataset}-${new Date().toISOString().slice(0, 10)}.json`, exportTimesheetJson(workspace.logs, workspace.report, dataset, workspace.periods));
+        setStatus(`Exported ${workspace.logs.length} time entries, ${workspace.report.entries.length} leave/adjustment entries, ${workspace.periods.length} POPs, and all saved settings.`);
       })}><Download size={16} />Export JSON</button>
     </div>
     <label className="form-label" htmlFor="timesheet-json-file">JSON file</label>
     <input id="timesheet-json-file" className="form-input" type="file" accept=".json,application/json" disabled={busy || workspace.busy || !workspace.ready} onChange={async event => {
       const token = ++selection.current;
       const selected = event.target.files?.[0];
-      setFile(null); setStatus(''); setError('');
+      setFile(null); setStatus(''); setError(''); setConfirmed(false);
       if (!selected) { setReading(false); return; }
       setReading(true);
       try {
@@ -58,15 +57,18 @@ export const DataTransferSettings: React.FC<{ workspace: Workspace; isSample: bo
       finally { if (selection.current === token) setReading(false); }
     }} />
     {reading && <p role="status">Reading JSON file…</p>}
-    {file && <p className="json-import-preview">{file.name}: {file.backup.logs.length} entries; {missing} new dates and {file.backup.logs.length - missing} already saved.</p>}
-    <p className="settings-description">Imports add missing dates. Existing entries and leave settings are kept. {isSample ? 'Sample imports stay in this browser.' : 'Leave settings from the file are added only if none have been saved to your account.'} Nothing is deleted.</p>
-    <div className="sample-actions"><button type="button" className="btn-primary" disabled={disabled || !file} onClick={() => void run(async () => {
-      if (!file) return;
+    {file && <p className="json-import-preview">{file.name}: {file.backup.logs.length} time entries; {file.backup.report?.entries.length ?? 0} leave/adjustment entries; {file.backup.periods?.length ?? 'default'} POPs.</p>}
+    <p className="settings-description">Import replaces every time entry, leave/adjustment entry, POP definition, opening balance, and saved forecast setting in {isSample ? 'this sample workspace only' : 'your signed-in account only'}. Existing data absent from the file is removed. Export a backup first if you want to keep it.</p>
+    {file && (!file.backup.report || file.backup.periods === undefined) && <p role="note">This older file is incomplete. Missing leave/settings reset to defaults; missing POP definitions reset to the original POP list.</p>}
+    <label className="restore-confirmation"><input type="checkbox" checked={confirmed} disabled={disabled || !file} onChange={event => setConfirmed(event.target.checked)} /><span>Replace all data in {isSample ? '2026 sample data' : 'My data'} with this file.</span></label>
+    <div className="sample-actions"><button type="button" className="btn-primary" disabled={disabled || !file || !confirmed} onClick={() => void run(async () => {
+      if (!file || !confirmed) return;
       const count = await workspace.importJson(file.contents);
-      setStatus(`Imported ${count} missing entries. Existing data was kept.`);
+      setStatus(`Replaced this workspace with ${count} time entries and the file's leave, POP, and settings data.`);
+      setConfirmed(false);
     })}><Upload size={16} />{busy ? 'Working…' : 'Import JSON'}</button></div>
     {!isSample && <div className="browser-import">
-      <p>{hasLegacy ? `${legacy.length} previous personal entries are available in this browser. Browser originals are kept.` : 'No previous personal records were found in this browser. Choose a JSON file above to import a backup from another browser or device.'}</p>
+      <p>{hasLegacy ? `${legacy.length} previous personal entries are available in this browser. This browser-migration option only adds missing dates/settings and keeps existing cloud data and browser originals.` : 'No previous personal records were found in this browser. Choose a JSON file above to import a backup from another browser or device.'}</p>
       <div className="sample-actions">
         <button type="button" className="btn-secondary" disabled={disabled || !hasLegacy} onClick={() => void run(async () => {
           const count = await workspace.importBrowser();

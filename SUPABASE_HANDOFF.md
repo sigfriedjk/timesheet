@@ -2,6 +2,12 @@
 
 ## Resume here
 
+### Complete workspace backup update
+
+The complete-workspace branch adds per-account editable POP definitions (`timesheet_pop_settings`), a version 2 backup covering every saved input, and confirmed JSON replacement through `replace_timesheet_workspace`. Birthday credit is fixed to January; opening balances and the existing work-rate/PTO-inference/monthly-forecast inputs are retained. Monthly balances are calculated. Daily calculator helper inputs remain temporary. Older JSON files are accepted with an explicit omitted-section/default-reset warning. Browser migration remains non-destructive.
+
+The second migration (`202610220001_complete_workspace.sql`) has been applied live. 83 unit/PostgreSQL tests, 12 browser tests, build/local production smoke, and real Supabase/Chromium checks pass, including POP isolation, complete replacement of all leave categories/settings/POPs, rollback after invalid data, session refresh and cleanup of disposable accounts. Setup now applies all migration files in order. The remaining sections describe older releases and are historical.
+
 - Repository: https://github.com/sigfriedjk/timesheet
 - Branch: `wip/supabase-integration-20261021` — check it out and read this file first.
 - Production: https://sigfriedjk.github.io/timesheet/

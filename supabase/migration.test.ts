@@ -19,22 +19,28 @@ beforeAll(async () => {
     grant execute on function auth.uid() to anon, authenticated;
     insert into auth.users values ('${A}'), ('${B}');`);
   const migration = readFileSync(new URL('./migrations/202610210001_timesheet.sql', import.meta.url), 'utf8');
+  const workspace = readFileSync(new URL('./migrations/202610220001_complete_workspace.sql', import.meta.url), 'utf8');
   await db.exec(migration);
+  await db.exec(workspace);
   // Reproduce the broad default grants observed on the live project.
-  await db.exec('grant all on public.timesheet_logs, public.timesheet_reports to anon, authenticated');
+  await db.exec('grant all on public.timesheet_logs, public.timesheet_reports, public.timesheet_pop_settings to anon, authenticated');
   await db.exec(migration); // Repeatability is part of the setup contract.
+  await db.exec(workspace);
 }, 30000);
 afterAll(async () => { await db?.close(); });
 describe('Migration on embedded PostgreSQL (local verification)', () => {
   it('removes inherited TRUNCATE privileges that bypass row security', async () => {
     await expect(asUser(A, 'truncate public.timesheet_logs')).rejects.toThrow('permission denied');
     await expect(asUser(A, 'truncate public.timesheet_reports')).rejects.toThrow('permission denied');
+    await expect(asUser(A, 'truncate public.timesheet_pop_settings')).rejects.toThrow('permission denied');
   });
   it('denies anonymous tables and the import RPC', async () => {
     await db.exec('set role anon');
     try {
       await expect(db.query('select * from public.timesheet_logs')).rejects.toThrow('permission denied');
       await expect(db.query('select * from public.timesheet_reports')).rejects.toThrow('permission denied');
+      await expect(db.query('select * from public.timesheet_pop_settings')).rejects.toThrow('permission denied');
+      await expect(db.query(`select public.replace_timesheet_workspace('[]', '{}', '[]')`)).rejects.toThrow('permission denied');
       await expect(db.query(`select public.import_browser_timesheet('[]')`)).rejects.toThrow('permission denied');
     } finally { await db.exec('reset role'); }
   });
@@ -66,5 +72,33 @@ describe('Migration on embedded PostgreSQL (local verification)', () => {
   it('validates report shape and requires a signed-in identity even for authenticated role', async () => {
     await expect(asUser(A, `update public.timesheet_reports set state = '{}'`)).rejects.toThrow('check constraint');
     await expect(asUser('', `select public.import_browser_timesheet('[]')`)).rejects.toThrow('Sign in');
+  });
+  it('isolates POP edits and replaces only the signed-in workspace, rolling back all sections on invalid data', async () => {
+    const periods = JSON.stringify([{ id: 'edited', name: 'Custom POP', startDate: '2026-01-01', endDate: '2026-12-31', targetHours: 1500.5 }]);
+    await asUser(A, `insert into public.timesheet_pop_settings(periods) values ('${periods}')`);
+    expect((await asUser(B, 'select * from public.timesheet_pop_settings')).rows).toEqual([]);
+    await expect(asUser(B, `insert into public.timesheet_pop_settings(user_id,periods) values ('${A}', '[]')`)).rejects.toThrow('row-level security');
+    expect((await asUser(B, `update public.timesheet_pop_settings set periods = '[]' where user_id = '${A}' returning *`)).rows).toEqual([]);
+    expect((await asUser(B, `delete from public.timesheet_pop_settings where user_id = '${A}' returning *`)).rows).toEqual([]);
+    await expect(asUser(A, `update public.timesheet_pop_settings set user_id = '${B}'`)).rejects.toThrow('row-level security');
+    const restored = JSON.stringify({ ...report, settings: { openingPto: 123, autoPto: false }, entries: [{ id: 'leave', date: '2026-10-02', category: 'adjustment', hours: -1.25 }], projectedWork: { '2026-11': 120 } });
+    const logs = '[{"user_id":"'+B+'","date":"2026-10-05","total_hours":4.1,"notes":"restore"}]';
+    expect((await asUser(A, `select public.replace_timesheet_workspace('${logs}','${restored}','${periods}') as count`)).rows).toEqual([{ count: 1 }]);
+    expect((await asUser(A, 'select date::text, total_hours, user_id from public.timesheet_logs')).rows).toEqual([{ date: '2026-10-05', total_hours: '4.1', user_id: A }]);
+    expect((await asUser(A, 'select state from public.timesheet_reports')).rows).toEqual([{ state: JSON.parse(restored) }]);
+    expect((await asUser(A, 'select periods from public.timesheet_pop_settings')).rows).toEqual([{ periods: JSON.parse(periods) }]);
+    expect((await asUser(B, 'select total_hours from public.timesheet_logs')).rows).toEqual([{ total_hours: '3.0' }]);
+    await expect(asUser(A, `select public.replace_timesheet_workspace('[{"date":"2026-10-06","total_hours":25}]','${restored}','[]')`)).rejects.toThrow('check constraint');
+    await expect(asUser(A, `select public.replace_timesheet_workspace('[]','{}','[]')`)).rejects.toThrow('check constraint');
+    const badPeriods = JSON.stringify([{ id: 'bad', name: 'Bad', startDate: '2026-10-10', endDate: '2026-01-01', targetHours: 1 }]);
+    await expect(asUser(A, `select public.replace_timesheet_workspace('[]','${restored}','${badPeriods}')`)).rejects.toThrow('Invalid POP');
+    expect((await asUser(A, 'select total_hours from public.timesheet_logs')).rows).toEqual([{ total_hours: '4.1' }]);
+    expect((await asUser(A, 'select state from public.timesheet_reports')).rows).toEqual([{ state: JSON.parse(restored) }]);
+    expect((await asUser(A, 'select periods from public.timesheet_pop_settings')).rows).toEqual([{ periods: JSON.parse(periods) }]);
+    await expect(asUser('', `select public.replace_timesheet_workspace('[]','${restored}','[]')`)).rejects.toThrow('Sign in');
+    await asUser(A, `select public.replace_timesheet_workspace('[]','${restored}','[]')`);
+    expect((await asUser(A, 'select * from public.timesheet_logs')).rows).toEqual([]);
+    expect((await asUser(A, 'select periods from public.timesheet_pop_settings')).rows).toEqual([{ periods: [] }]);
+    expect((await asUser(B, 'select total_hours from public.timesheet_logs')).rows).toEqual([{ total_hours: '3.0' }]);
   });
 });

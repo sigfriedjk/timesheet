@@ -41,7 +41,7 @@
 3. **Supabase Setup:** Create a project at [supabase.com](https://supabase.com) and retrieve public `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 4. **Auth Redirect Configuration:** In the Supabase Dashboard (*Authentication -> URL Configuration*), add the GitHub Pages deployment URL (e.g., `https://<username>.github.io/<repo>/`) to the allowed **Redirect URLs**.
 5. **Database & RLS Setup:** 
-   * Apply `supabase/migrations/202610210001_timesheet.sql`: `timesheet_logs`, `timesheet_reports`, owner policies, timestamp triggers, and an atomic import RPC. POP definitions remain shared static configuration.
+   * Apply all files in `supabase/migrations/` in order: `timesheet_logs`, `timesheet_reports`, `timesheet_pop_settings`, owner policies, timestamp triggers, a non-destructive browser migration RPC, and an atomic complete-workspace replacement RPC.
    * Add a `user_id` column referencing `auth.users(id)`.
    * Enable **Row Level Security (RLS)** on all tables and create policies restricting CRUD operations to matching `auth.uid()`.
 
@@ -49,6 +49,10 @@
 ## 5. Persistence lifecycle and verification
 
 Personal views are gated on session recovery and completed cloud loading. Repository reads page history in batches of 500 and scope queries by user; PostgreSQL RLS is the security boundary. Report JSON stores leave settings, entries, projections, and the PTO policy version. Every editor awaits acknowledgement before showing success or closing, and failures preserve drafts. Workspace identities reject stale loads/saves after source, account, or project changes. Sample mode never instantiates the SDK client or refreshes sessions.
+
+`WorkspaceData` combines time logs, report inputs, and POP definitions. `timesheet_pop_settings` stores a per-account list with validated names, IDs, inclusive dates, and funded hours; no row means the original defaults, while an explicit empty list stays empty. Monthly balances/accruals/totals are derived, and birthday credit is fixed to January. Calculator inputs remain temporary.
+
+Version 2 JSON backups cover the complete input model. Confirmed file import calls `replace_timesheet_workspace` with all three sections, replacing only `auth.uid()` data in a security-invoker transaction. Errors roll back deletes and inserts together. Sample replacement uses one JSON storage key for atomic writes, with legacy split-key reads supported until the first snapshot is saved. Subsequent sample edits preserve the full snapshot. Older backups restore omitted sections to defaults after a visible warning.
 
 Legacy personal browser data is never read as an automatic fallback. Explicit import uses a security-invoker transaction, inserts missing dates/settings only, and preserves browser originals. Privileged project keys are server-only verification tools; schema/Auth configuration requires Management API authorization or SQL/dashboard access. No arbitrary SQL capability is inferred from a project secret.
 

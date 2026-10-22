@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { SupabaseConnection } from '../hooks/useSupabaseConnection';
 import { Workspace } from '../hooks/useWorkspace';
-import setupSql from '../../supabase/migrations/202610210001_timesheet.sql?raw';
+import baseSql from '../../supabase/migrations/202610210001_timesheet.sql?raw';
+import workspaceSql from '../../supabase/migrations/202610220001_complete_workspace.sql?raw';
+const setupSql = `${baseSql}\n${workspaceSql}`;
 
 const message = (error: unknown) => error instanceof Error ? error.message : 'The request could not be completed.';
 

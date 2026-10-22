@@ -1035,6 +1035,9 @@ button:disabled { cursor: wait; }
 .data-transfer-settings .form-label { display: block; margin-top: 1rem; }
 .data-transfer-settings input[type="file"] { box-sizing: border-box; max-width: 100%; }
 .json-import-preview { overflow-wrap: anywhere; }
+.pop-editor { margin-top: 1rem; }
+.pop-settings > .sample-actions { margin-top: 1rem; }
+.restore-confirmation { display: flex; align-items: flex-start; gap: .65rem; margin: 1rem 0; }
 .setup-steps { padding-left: 1.5rem; line-height: 1.6; }
 .setup-steps code { overflow-wrap: anywhere; }
 .setup-sql { max-height: 260px; overflow: auto; padding: 1rem; font-size: .75rem; background: var(--bg-primary); border-radius: 8px; }
