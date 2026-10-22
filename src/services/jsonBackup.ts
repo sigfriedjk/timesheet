@@ -1,4 +1,4 @@
-import { LeaveCategory, MonthlyReportState, TimeLog } from '../types';
+import { LeaveCategory, MonthlyReportState, PeriodOfPerformance, TimeLog } from '../types';
 import { createDefaultMonthlyReport } from '../utils/monthlySummary';
 import { roundToTenth } from '../utils/calculations';
 import { generateId, LogDataset } from './storage';
@@ -7,6 +7,7 @@ export interface TimesheetImport {
   logs: TimeLog[];
   report: MonthlyReportState | null;
   dataset?: LogDataset;
+  periods?: PeriodOfPerformance[];
 }
 
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -40,8 +41,6 @@ function report(value: unknown): MonthlyReportState | null {
   const autoPto = setting('autoPto');
   if (typeof autoPto !== 'boolean') return fail('automatic PTO setting');
   if (value.ptoPolicyVersion !== undefined && value.ptoPolicyVersion !== 0 && value.ptoPolicyVersion !== 1) return fail('PTO policy version');
-  const birthdayMonth = number(setting('birthdayMonth'), 'birthday month', 1, 12);
-  if (!Number.isInteger(birthdayMonth)) return fail('birthday month');
   const categories: LeaveCategory[] = ['pto', 'holiday', 'birthday', 'overhead', 'adjustment'];
   const entryIds = new Set<string>();
   const entries = value.entries.map(entry => {
@@ -61,12 +60,25 @@ function report(value: unknown): MonthlyReportState | null {
       openingPto: number(setting('openingPto'), 'opening PTO'),
       openingHoliday: number(setting('openingHoliday'), 'opening holiday balance'),
       openingBirthday: number(setting('openingBirthday'), 'opening birthday balance'),
-      birthdayMonth, workPercent: number(setting('workPercent'), 'work percentage', 0, 200),
+      workPercent: number(setting('workPercent'), 'work percentage', 0, 200),
       autoPto: (value.ptoPolicyVersion ?? 0) < 1 ? true : autoPto,
     },
     entries,
     projectedWork: Object.fromEntries(Object.entries(projections).map(([key, hours]) => [month(key, 'projection month'), number(hours, 'projected hours', 0)])),
   };
+}
+
+export function validatePeriods(value: unknown): PeriodOfPerformance[] {
+  if (!Array.isArray(value)) return fail('POP list');
+  const ids = new Set<string>();
+  return value.map(item => {
+    if (!object(item) || typeof item.id !== 'string' || !item.id.trim() || typeof item.name !== 'string' || !item.name.trim()) return fail('POP name or ID');
+    if (ids.has(item.id)) return fail('duplicate POP ID');
+    ids.add(item.id);
+    const startDate = date(item.startDate, 'POP start date'), endDate = date(item.endDate, 'POP end date');
+    if (endDate < startDate) return fail('POP date range');
+    return { id: item.id, name: item.name.trim(), startDate, endDate, targetHours: number(item.targetHours, 'POP funded hours', 0) };
+  });
 }
 
 /** Validate the entire file before any storage writes; accept older log-array downloads too. */
@@ -76,7 +88,7 @@ export function parseTimesheetJson(contents: string): TimesheetImport {
   const backup = Array.isArray(value) ? { logs: value } : value;
   if (!object(backup) || !Array.isArray(backup.logs)) throw new Error('Expected a timesheet JSON backup or an array of time entries.');
   if (backup.format !== undefined && backup.format !== 'timesheet') return fail('backup format');
-  if (backup.version !== undefined && backup.version !== 1) throw new Error('This JSON backup version is not supported.');
+  if (backup.version !== undefined && backup.version !== 1 && backup.version !== 2) throw new Error('This JSON backup version is not supported.');
   if (backup.dataset !== undefined && backup.dataset !== 'personal' && backup.dataset !== 'sample2026') return fail('data source');
   const dates = new Set<string>();
   const now = new Date().toISOString();
@@ -90,12 +102,13 @@ export function parseTimesheetJson(contents: string): TimesheetImport {
       notes: notes(row.notes), createdAt: typeof row.createdAt === 'string' ? row.createdAt : now,
       updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : now };
   });
-  return { logs, report: report(backup.report), dataset: backup.dataset as LogDataset | undefined };
+  if (backup.version === 2 && (!object(backup.report) || backup.periods === undefined)) throw new Error('This complete backup is missing leave settings or POP data.');
+  return { logs, report: report(backup.report), periods: backup.periods === undefined ? undefined : validatePeriods(backup.periods), dataset: backup.dataset as LogDataset | undefined };
 }
 
 /** Export timesheet data only, with no Auth session, account IDs, or connection credentials. */
-export function exportTimesheetJson(logs: TimeLog[], state: MonthlyReportState | null, dataset: LogDataset): string {
-  return JSON.stringify({ format: 'timesheet', version: 1, exportedAt: new Date().toISOString(), dataset,
+export function exportTimesheetJson(logs: TimeLog[], state: MonthlyReportState | null, dataset: LogDataset, periods?: PeriodOfPerformance[]): string {
+  return JSON.stringify({ format: 'timesheet', version: periods !== undefined && state !== null ? 2 : 1, exportedAt: new Date().toISOString(), dataset,
     logs: logs.map(log => ({ id: log.id, date: log.date, totalHours: log.totalHours, notes: log.notes, createdAt: log.createdAt, updatedAt: log.updatedAt })),
-    report: report(state) }, null, 2);
+    report: report(state), ...(periods !== undefined ? { periods: validatePeriods(periods) } : {}) }, null, 2);
 }

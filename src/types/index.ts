@@ -62,7 +62,6 @@ export interface LeaveSettings {
   openingPto: number;
   openingHoliday: number;
   openingBirthday: number;
-  birthdayMonth: number;
   workPercent: number;
   autoPto: boolean;
 }
@@ -72,4 +71,11 @@ export interface MonthlyReportState {
   settings: LeaveSettings;
   entries: LeaveEntry[];
   projectedWork: Record<string, number>;
+}
+
+/** Saved inputs only; monthly balances, accruals, and totals are calculated. */
+export interface WorkspaceData {
+  logs: TimeLog[];
+  report: MonthlyReportState;
+  periods: PeriodOfPerformance[];
 }

@@ -1,7 +1,8 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { MonthlyReportState, TimeLog } from '../types';
+import { MonthlyReportState, PeriodOfPerformance, TimeLog } from '../types';
+import { POP_PERIODS } from '../config/periodsOfPerformance';
 import { roundToTenth } from '../utils/calculations';
-import { createDefaultMonthlyReport } from '../utils/monthlySummary';
+import { createDefaultMonthlyReport, normalizeLeaveSettings } from '../utils/monthlySummary';
 
 interface LogRow { id: string; date: string; total_hours: number; notes: string | null; created_at: string; updated_at: string }
 const mapLog = (row: LogRow): TimeLog => ({ id: row.id, date: row.date, totalHours: Number(row.total_hours), notes: row.notes ?? undefined, createdAt: row.created_at, updatedAt: row.updated_at });
@@ -10,7 +11,8 @@ const check = (error: { message: string } | null) => { if (error) throw new Erro
 export function normalizeMonthlyReport(parsed: Partial<MonthlyReportState> | null): MonthlyReportState {
   const fallback = createDefaultMonthlyReport();
   if (!parsed || !Array.isArray(parsed.entries)) return fallback;
-  const state = { ...fallback, ...parsed, settings: { ...fallback.settings, ...parsed.settings }, entries: parsed.entries, projectedWork: parsed.projectedWork ?? {} };
+  const settings = normalizeLeaveSettings(parsed.settings, fallback.settings);
+  const state = { ptoPolicyVersion: parsed.ptoPolicyVersion ?? 0, settings, entries: parsed.entries, projectedWork: parsed.projectedWork ?? {} };
   if ((parsed.ptoPolicyVersion ?? 0) < 1) { state.ptoPolicyVersion = 1; state.settings.autoPto = true; }
   return state;
 }
@@ -31,7 +33,9 @@ export function createSupabaseRepository(client: SupabaseClient, userId: string)
       }
       const { data, error } = await client.from('timesheet_reports').select('state').eq('user_id', userId).maybeSingle();
       check(error);
-      return { logs, report: normalizeMonthlyReport(data?.state ?? null) };
+      const { data: popData, error: popError } = await client.from('timesheet_pop_settings').select('periods').eq('user_id', userId).maybeSingle();
+      check(popError);
+      return { logs, report: normalizeMonthlyReport(data?.state ?? null), periods: (popData?.periods ?? POP_PERIODS.map(period => ({ ...period }))) as PeriodOfPerformance[] };
     },
     async saveLog(date: string, hours: number, notes?: string) {
       const { data, error } = await client.from('timesheet_logs').upsert({ user_id: userId, date, total_hours: roundToTenth(hours), notes: notes ?? null }, { onConflict: 'user_id,date' }).select().single();
@@ -45,11 +49,26 @@ export function createSupabaseRepository(client: SupabaseClient, userId: string)
       if (!data?.length) throw new Error('The entry could not be deleted. Reload your timesheet and try again.');
     },
     async saveReport(state: MonthlyReportState) {
-      const report = { ...state, ptoPolicyVersion: 1 };
+      const report = normalizeMonthlyReport({ ...state, ptoPolicyVersion: 1 });
       const { data, error } = await client.from('timesheet_reports').upsert({ user_id: userId, state: report }, { onConflict: 'user_id' }).select('state').single();
       check(error);
       if (!data) throw new Error('Leave settings were not saved. Please retry.');
       return report;
+    },
+    async savePeriods(periods: PeriodOfPerformance[]) {
+      const { data, error } = await client.from('timesheet_pop_settings').upsert({ user_id: userId, periods }, { onConflict: 'user_id' }).select('periods').single();
+      check(error);
+      if (!data) throw new Error('POP changes were not saved. Please retry.');
+      return data.periods as PeriodOfPerformance[];
+    },
+    async replaceWorkspace(logs: TimeLog[], report: MonthlyReportState, periods: PeriodOfPerformance[]) {
+      const { data, error } = await client.rpc('replace_timesheet_workspace', {
+        p_logs: logs.map(log => ({ date: log.date, total_hours: roundToTenth(log.totalHours), notes: log.notes ?? null })),
+        p_report: report, p_periods: periods,
+      });
+      check(error);
+      if (typeof data !== 'number') throw new Error('The replacement was not acknowledged. Please reload your data.');
+      return data;
     },
     async importBrowserData(logs: TimeLog[], report: MonthlyReportState | null) {
       const { data, error } = await client.rpc('import_browser_timesheet', {

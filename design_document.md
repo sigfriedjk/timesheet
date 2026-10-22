@@ -157,7 +157,7 @@ Represents manual overrides or adjustments to the running leave balance for a gi
 
 ### Interface 4: POP Pivot Summary View
 
-* **POP Summary Table:** Aggregates logged time by inclusive Period of Performance ranges. The current release uses 24 fixed definitions, POP A–X, from April 25, 2024 through June 30, 2027. Settings displays the dates and funded amounts; interactive editing is deferred.
+* **POP Summary Table:** Aggregates logged time by inclusive Period of Performance ranges. New workspaces start with 24 definitions, POP A–X, from April 25, 2024 through June 30, 2027. Settings supports adding, editing, and deleting names, dates, and funded hours, persisted per account or local sample workspace.
 
 * **Columns:**
 
@@ -177,7 +177,9 @@ Represents manual overrides or adjustments to the running leave balance for a gi
 
   8. `Funded − Worked` (Signed difference, rounded to 0.1; negative indicates an overrun)
 
-The year filter selects full POPs overlapping that year without truncating cross-year ranges. All-years mode displays all 24 periods. Future logs and estimates are excluded from worked hours. Definitions are shared between personal and sample workspaces while worked hours remain isolated.
+The year filter selects full POPs overlapping that year without truncating cross-year ranges. All-years mode displays all saved periods. Future logs and estimates are excluded from worked hours. Definitions and worked hours are isolated between personal and sample workspaces.
+
+Complete JSON backups include daily hours/notes, POP definitions, all five monthly leave/adjustment categories with notes, opening balances/month, and existing forecast/PTO-policy inputs. Monthly balances remain calculated from accrued and used amounts. Birthday credit is always in January. JSON import requires explicit confirmation and replaces all selected-workspace inputs atomically; an invalid restore leaves every original section intact. The separate previous-browser migration only adds missing data.
 
 ### Interface 5: POP & System Settings
 

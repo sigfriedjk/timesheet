@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { MonthlyReportState, TimeLog } from '../types';
+import { MonthlyReportState, PeriodOfPerformance, WorkspaceData } from '../types';
 import { createDefaultMonthlyReport } from '../utils/monthlySummary';
 import { createSupabaseRepository, normalizeMonthlyReport } from '../services/supabaseRepository';
-import { deleteTimeLog, getAllTimeLogs, getMonthlyReportState, importSampleLogs, initializeSampleLogs, LogDataset, saveMonthlyReportState, saveTimeLog } from '../services/storage';
-import { parseTimesheetJson } from '../services/jsonBackup';
+import { defaultPeriods, deleteTimeLog, getAllTimeLogs, getMonthlyReportState, getSamplePeriods, initializeSampleLogs, LogDataset, replaceSampleWorkspace, saveMonthlyReportState, saveSamplePeriods, saveTimeLog } from '../services/storage';
+import { parseTimesheetJson, validatePeriods } from '../services/jsonBackup';
 
-type Data = { logs: TimeLog[]; report: MonthlyReportState };
-const empty = (): Data => ({ logs: [], report: createDefaultMonthlyReport() });
+type Data = WorkspaceData;
+const empty = (): Data => ({ logs: [], report: createDefaultMonthlyReport(), periods: defaultPeriods() });
+const loadSample = (): Data => ({ logs: initializeSampleLogs(), report: getMonthlyReportState('sample2026'), periods: getSamplePeriods() });
 
 export function useWorkspace(dataset: LogDataset, client: SupabaseClient | null, userId?: string) {
   const repository = useMemo(() => dataset === 'personal' && client && userId ? createSupabaseRepository(client, userId) : null, [dataset, client, userId]);
@@ -29,7 +30,7 @@ export function useWorkspace(dataset: LogDataset, client: SupabaseClient | null,
     const load = async () => {
       try {
         if (dataset === 'personal' && !repository) return;
-        const data = repository ? await repository.load() : { logs: initializeSampleLogs(), report: getMonthlyReportState('sample2026') };
+        const data = repository ? await repository.load() : loadSample();
         if (active) setSnapshot({ identity, ...data, ready: true, error: '' });
       } catch (error) {
         if (active) setSnapshot({ ...empty(), identity, ready: false, error: error instanceof Error ? error.message : 'Could not load Supabase data.' });
@@ -64,7 +65,7 @@ export function useWorkspace(dataset: LogDataset, client: SupabaseClient | null,
     }
   };
   return {
-    logs: current ? snapshot.logs : [], report: current ? snapshot.report : createDefaultMonthlyReport(), ready,
+    logs: current ? snapshot.logs : [], report: current ? snapshot.report : createDefaultMonthlyReport(), periods: current ? snapshot.periods : defaultPeriods(), ready,
     error: current ? snapshot.error : '', busy: savingIdentity === identity,
     reload: () => {
       if (pending.current) return;
@@ -84,6 +85,11 @@ export function useWorkspace(dataset: LogDataset, client: SupabaseClient | null,
       const saved = repository ? await repository.saveReport(report) : (saveMonthlyReportState(report, 'sample2026'), report);
       apply({ report: saved });
     }),
+    savePeriods: (periods: PeriodOfPerformance[]) => operation(async () => {
+      const valid = validatePeriods(periods);
+      const saved = repository ? await repository.savePeriods(valid) : (saveSamplePeriods(valid), valid);
+      apply({ periods: saved });
+    }),
     importBrowser: () => operation(async () => {
       if (!repository) throw new Error('Sign in to Supabase before importing personal browser data.');
       const count = await repository.importBrowserData(getAllTimeLogs(), getLegacyReport());
@@ -95,9 +101,12 @@ export function useWorkspace(dataset: LogDataset, client: SupabaseClient | null,
     importJson: (contents: string) => operation(async () => {
       const backup = parseTimesheetJson(contents);
       if (backup.dataset && backup.dataset !== dataset) throw new Error(`This backup belongs to ${backup.dataset === 'sample2026' ? '2026 sample data' : 'My data'}. Switch data source before importing it.`);
-      const count = repository ? await repository.importBrowserData(backup.logs, backup.report) : importSampleLogs(backup.logs);
+      const report = backup.report ?? createDefaultMonthlyReport(dataset === 'sample2026' ? 2026 : undefined);
+      const periods = backup.periods ?? defaultPeriods();
+      const count = repository ? await repository.replaceWorkspace(backup.logs, report, periods)
+        : (replaceSampleWorkspace({ logs: backup.logs, report, periods }), backup.logs.length);
       assertCurrent();
-      const data = repository ? await repository.load() : { logs: getAllTimeLogs('sample2026'), report: getMonthlyReportState('sample2026') };
+      const data = repository ? await repository.load() : loadSample();
       apply(data);
       return count;
     }),
@@ -105,7 +114,7 @@ export function useWorkspace(dataset: LogDataset, client: SupabaseClient | null,
       if (dataset !== 'sample2026' || pending.current) return 0;
       assertCurrent();
       const logs = initializeSampleLogs(true);
-      apply({ logs, report: getMonthlyReportState('sample2026') });
+      apply({ logs, report: getMonthlyReportState('sample2026'), periods: getSamplePeriods() });
       return logs.length;
     },
   };

@@ -1,4 +1,4 @@
-import { LeaveEntry, MonthlyReportState, TimeLog } from '../types';
+import { LeaveEntry, LeaveSettings, MonthlyReportState, TimeLog } from '../types';
 import { calendarDate, getMonthDays } from './calendar';
 import { roundToHundredth as cents, roundToTenth as tenths } from './calculations';
 
@@ -16,7 +16,18 @@ export interface MonthlyRow {
 
 export function createDefaultMonthlyReport(year = new Date().getFullYear()): MonthlyReportState {
   return { ptoPolicyVersion: 1, settings: { openingMonth: `${year}-01`, openingPto: 0, openingHoliday: 0, openingBirthday: 0,
-    birthdayMonth: 1, workPercent: 94.3, autoPto: true }, entries: [], projectedWork: {} };
+    workPercent: 94.3, autoPto: true }, entries: [], projectedWork: {} };
+}
+
+export function normalizeLeaveSettings(settings: Partial<LeaveSettings> | undefined, defaults: LeaveSettings): LeaveSettings {
+  return {
+    openingMonth: settings?.openingMonth ?? defaults.openingMonth,
+    openingPto: settings?.openingPto ?? defaults.openingPto,
+    openingHoliday: settings?.openingHoliday ?? defaults.openingHoliday,
+    openingBirthday: settings?.openingBirthday ?? defaults.openingBirthday,
+    workPercent: settings?.workPercent ?? defaults.workPercent,
+    autoPto: settings?.autoPto ?? defaults.autoPto,
+  };
 }
 
 function monthIndex(key: string) {
@@ -90,7 +101,7 @@ export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, 
     const actualPtoAccrued = cents(actualHours * PTO_RATE);
     const accruedPto = cents(workHours * PTO_RATE);
     const accruedHoliday = holidays.length * DAY_HOURS;
-    const accruedBirthday = month + 1 === settings.birthdayMonth ? DAY_HOURS : 0;
+    const accruedBirthday = month === 0 ? DAY_HOURS : 0;
     const actualAdjustment = total(actualEntries, 'adjustment');
     const adjustment = cents(actualAdjustment + total(futureEntries, 'adjustment'));
     const usedPto = cents(actualPtoUsed + futurePtoUsed);

@@ -1,5 +1,5 @@
 // Server-only Management API setup. A project secret key is deliberately never used here.
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { EnvHttpProxyAgent, fetch } from 'undici';
 const token = process.env.SUPABASE_MASTER || process.env.SUPABASE_ACCESS_TOKEN;
 if (!token) throw new Error('Schema/Auth configuration requires SUPABASE_MASTER or SUPABASE_ACCESS_TOKEN (Management API), or apply the migration with the SQL Editor/PostgreSQL and configure Auth in the dashboard. SUPABASE_SECRET_KEY cannot substitute for this capability.');
@@ -20,8 +20,11 @@ async function request(path, method = 'GET', body) {
 try {
   // Read authorization/configuration first. No secret-key SQL endpoint is assumed.
   const auth = await request('config/auth');
-  const migration = await readFile(new URL('../supabase/migrations/202610210001_timesheet.sql', import.meta.url), 'utf8');
-  await request('database/query', 'POST', { query: migration });
+  const directory = new URL('../supabase/migrations/', import.meta.url);
+  for (const name of (await readdir(directory)).filter(name => name.endsWith('.sql')).sort()) {
+    const migration = await readFile(new URL(name, directory), 'utf8');
+    await request('database/query', 'POST', { query: migration });
+  }
   console.log('Database migration applied, including owner RLS and restricted browser-role privileges.');
   const redirect = 'https://sigfriedjk.github.io/timesheet/**';
   const redirects = new Set((auth.uri_allow_list || '').split(',').map(value => value.trim()).filter(Boolean));

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { useWorkspace, getLegacyReport } from './useWorkspace';
 import { createDefaultMonthlyReport } from '../utils/monthlySummary';
-import { clearStorageForTesting, getAllTimeLogs, saveTimeLog } from '../services/storage';
+import { clearStorageForTesting, defaultPeriods, getAllTimeLogs, saveTimeLog } from '../services/storage';
 import { LogDataset } from '../services/storage';
 import { exportTimesheetJson } from '../services/jsonBackup';
 
@@ -12,9 +12,9 @@ const mocks = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('../services/supabaseRepository', async original => ({ ...await original<any>(), createSupabaseRepository: mocks.create }));
 const client = {} as SupabaseClient;
 const log = (date: string) => ({ id: date, date, totalHours: 8, notes: 'cloud', createdAt: '', updatedAt: '' });
-const data = (date = '2026-10-01') => ({ logs: [log(date)], report: createDefaultMonthlyReport() });
+const data = (date = '2026-10-01') => ({ logs: [log(date)], report: createDefaultMonthlyReport(), periods: defaultPeriods() });
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done; }); return { promise, resolve }; }
-function repository() { return { load: vi.fn(async () => data()), saveLog: vi.fn(async () => log('2026-10-02')), deleteLog: vi.fn(async () => {}), saveReport: vi.fn(async state => state), importBrowserData: vi.fn(async () => 1) }; }
+function repository() { return { load: vi.fn(async () => data()), saveLog: vi.fn(async () => log('2026-10-02')), deleteLog: vi.fn(async () => {}), saveReport: vi.fn(async state => state), savePeriods: vi.fn(async periods => periods), replaceWorkspace: vi.fn(async () => 1), importBrowserData: vi.fn(async () => 1) }; }
 function hook(userId: string | undefined = 'a') { return renderHook(({ userId, dataset }) => useWorkspace(dataset, client, userId), { initialProps: { userId: userId as string | undefined, dataset: 'personal' as LogDataset } }); }
 beforeEach(() => { clearStorageForTesting(); mocks.create.mockReset(); });
 afterEach(cleanup);
@@ -25,27 +25,43 @@ describe('Workspace persistence and isolation', () => {
     await waitFor(() => expect(result.current.ready).toBe(true));
     const contents = exportTimesheetJson([log('2026-10-02')], data().report, 'personal');
     await act(async () => { expect(await result.current.importJson(contents)).toBe(1); });
-    expect(repo.importBrowserData).toHaveBeenCalledWith([log('2026-10-02')], data().report);
-    repo.importBrowserData.mockClear();
+    expect(repo.replaceWorkspace).toHaveBeenCalledWith([log('2026-10-02')], data().report, defaultPeriods());
+    repo.replaceWorkspace.mockClear();
     await act(async () => { await expect(result.current.importJson('[{"date":"2026-02-30","totalHours":8}]')).rejects.toThrow('date'); });
     await act(async () => { await expect(result.current.importJson(exportTimesheetJson([], null, 'sample2026'))).rejects.toThrow('Switch data source'); });
-    expect(repo.importBrowserData).not.toHaveBeenCalled();
-    repo.importBrowserData.mockRejectedValueOnce(new Error('Offline'));
+    expect(repo.replaceWorkspace).not.toHaveBeenCalled();
+    repo.replaceWorkspace.mockRejectedValueOnce(new Error('Offline'));
     await act(async () => { await expect(result.current.importJson(contents)).rejects.toThrow('Offline'); });
     expect(result.current.logs).toEqual(data().logs);
     expect(getAllTimeLogs()).toEqual([]);
   });
-  it('merges sample JSON locally, preserves conflicts and personal originals, and never creates a repository', async () => {
+  it('replaces the complete sample snapshot locally, preserves personal originals, and never creates a repository', async () => {
     saveTimeLog('2026-10-21', 12, 'personal original');
     const { result } = renderHook(() => useWorkspace('sample2026', client, 'a'));
     await waitFor(() => expect(result.current.ready).toBe(true));
-    const existing = result.current.logs.find(log => log.date === '2026-01-02')!;
-    const report = result.current.report;
-    const contents = JSON.stringify([{ date: '2026-01-02', totalHours: 1 }, { date: '2026-10-22', totalHours: 4.1 }]);
+    const report = createDefaultMonthlyReport(2026); report.settings.openingPto = 123;
+    const contents = exportTimesheetJson([log('2026-10-22')], report, 'sample2026', []);
     await act(async () => { expect(await result.current.importJson(contents)).toBe(1); });
-    expect(result.current.logs).toHaveLength(150);
-    expect(result.current.logs.find(log => log.date === existing.date)).toEqual(existing);
+    expect(result.current.logs).toHaveLength(1);
+    expect(result.current.periods).toEqual([]);
     expect(result.current.report).toEqual(report);
+    const original = localStorage.getItem('work_hours_tracker_sample_2026_workspace');
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage full'); });
+    await act(async () => { await expect(result.current.importJson(contents)).rejects.toThrow('Storage full'); });
+    write.mockRestore();
+    expect(localStorage.getItem('work_hours_tracker_sample_2026_workspace')).toBe(original);
+    await act(async () => { await result.current.saveLog('2026-10-23', 3); });
+    await act(async () => { await result.current.savePeriods(defaultPeriods().slice(0, 1)); });
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(result.current.logs).toHaveLength(2);
+    expect(result.current.periods).toHaveLength(1);
+    expect(result.current.report.settings.openingPto).toBe(123);
+    await act(async () => { await result.current.importJson(exportTimesheetJson([], report, 'sample2026', [])); });
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(result.current.logs).toEqual([]);
+    expect(result.current.periods).toEqual([]);
     expect(getAllTimeLogs()[0].notes).toBe('personal original');
     expect(mocks.create).not.toHaveBeenCalled();
   });

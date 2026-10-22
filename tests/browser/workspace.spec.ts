@@ -1,12 +1,13 @@
 import { expect, test, Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { POP_PERIODS } from '../../src/config/periodsOfPerformance';
 
 const HOST = 'https://yiqquogdutgujsacoezh.supabase.co';
 const A = '11111111-1111-4111-8111-111111111111';
-const report = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, birthdayMonth: 1, workPercent: 100, autoPto: true }, entries: [], projectedWork: {} };
+const report = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100, autoPto: true }, entries: [], projectedWork: {} };
 const entry = (date = '2026-10-01', hours = 8, notes = 'cloud entry') => ({ user_id: A, id: date, date, total_hours: hours, notes, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' });
 async function backend(page: Page, signedIn = true) {
-  const state = { logs: [entry()], report, failRead: false, failWrite: false, delay: 0, requests: [] as { path: string; method: string; body: any }[] };
+  const state = { logs: [entry()], report, periods: POP_PERIODS.map(period => ({ ...period })), failRead: false, failWrite: false, delay: 0, requests: [] as { path: string; method: string; body: any }[] };
   await page.route(`${HOST}/**`, async route => {
     const request = route.request(); const path = new URL(request.url()).pathname;
     const body = request.postDataJSON(); const method = request.method();
@@ -19,6 +20,15 @@ async function backend(page: Page, signedIn = true) {
       const missing = body.p_logs.filter((log: { date: string }) => !state.logs.some(existing => existing.date === log.date));
       state.logs.push(...missing.map((log: any) => entry(log.date, log.total_hours, log.notes)));
       data = missing.length;
+    }
+    else if (path.endsWith('/rpc/replace_timesheet_workspace')) {
+      state.logs = body.p_logs.map((log: any) => entry(log.date, log.total_hours, log.notes));
+      state.report = body.p_report; state.periods = body.p_periods;
+      data = state.logs.length;
+    }
+    else if (path.endsWith('/timesheet_pop_settings')) {
+      if (method === 'POST') state.periods = body.periods;
+      data = { periods: state.periods };
     }
     else if (path.endsWith('/timesheet_reports')) {
       if (method === 'POST') state.report = body.state;
@@ -48,31 +58,48 @@ test('Settings exposes JSON controls while signed out and explains when old brow
   await expect(page.getByText('No previous personal records were found in this browser.', { exact: false })).toBeVisible();
 });
 
-test('exports the current cloud snapshot and previews, validates and retries JSON imports without overwriting conflicts', async ({ page }) => {
+test('exports all saved inputs and requires confirmation before replacing every section; failed restores can retry', async ({ page }) => {
   const state = await backend(page);
+  state.logs.push(entry('2026-10-02', 7, 'removed by replacement'));
   await page.goto('/?view=settings');
   const card = page.locator('.data-transfer-settings');
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
   const download = await downloading;
   const backup = JSON.parse(await readFile((await download.path())!, 'utf8'));
-  expect(backup.logs).toHaveLength(1);
+  expect(backup.logs).toHaveLength(2);
   expect(backup.logs[0].totalHours).toBe(8);
   expect(backup.report).toEqual(report);
+  expect(backup.periods).toEqual(POP_PERIODS);
+  expect(backup.version).toBe(2);
+  expect(JSON.stringify(backup)).not.toMatch(/birthdayMonth|monthlyBalances/);
   expect(JSON.stringify(backup)).not.toMatch(/access_token|refresh_token|user_id/);
   await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'broken.json', mimeType: 'application/json', buffer: Buffer.from('[{"date":"2026-02-30","totalHours":8}]') });
   await expect(card.getByRole('alert')).toContainText('Invalid date');
   expect(state.requests.filter(request => request.path.includes('/rpc/'))).toHaveLength(0);
-  await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify([{ date: '2026-10-01', totalHours: 1 }, { date: '2026-10-22', totalHours: 4.1 }])) });
-  await expect(card.locator('.json-import-preview')).toContainText('1 new dates and 1 already saved');
+  const restoredReport = { ...report, settings: { ...report.settings, openingPto: 123, openingHoliday: 45, openingBirthday: 6, autoPto: false, workPercent: 90 },
+    entries: ['pto', 'holiday', 'birthday', 'overhead', 'adjustment'].map((category, i) => ({ id: category, date: '2026-10-05', category, hours: i === 4 ? -1.25 : i + 1, notes: `Restore ${category}` })), projectedWork: { '2026-11': 120 } };
+  const restoredPeriods = [{ ...POP_PERIODS[0], name: 'Restored POP', startDate: '2026-01-01', endDate: '2026-12-31', targetHours: 1800 }];
+  const replacement = { format: 'timesheet', version: 2, dataset: 'personal', logs: [{ date: '2026-10-01', totalHours: 1 }, { date: '2026-10-22', totalHours: 4.1 }], report: restoredReport, periods: restoredPeriods };
+  await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(replacement)) });
+  await expect(card.locator('.json-import-preview')).toContainText('2 time entries; 5 leave/adjustment entries; 1 POPs');
+  await expect(page.getByRole('button', { name: 'Import JSON', exact: true })).toBeDisabled();
+  await page.getByLabel('Replace all data in My data with this file.').check();
   state.failWrite = true;
   await page.getByRole('button', { name: 'Import JSON', exact: true }).click();
   await expect(card.getByRole('alert')).toContainText('Simulated connection failure');
   await expect(card.locator('.json-import-preview')).toBeVisible();
   state.failWrite = false;
   await page.getByRole('button', { name: 'Import JSON', exact: true }).click();
-  await expect(card.getByRole('status')).toContainText('Imported 1 missing entries');
-  expect(state.logs.find(log => log.date === '2026-10-01')!.total_hours).toBe(8);
+  await expect(card.getByRole('status')).toContainText('Replaced this workspace with 2 time entries');
+  expect(state.logs.find(log => log.date === '2026-10-01')!.total_hours).toBe(1);
+  expect(state.logs.some(log => log.date === '2026-10-02')).toBe(false);
+  expect(state.report).toEqual(restoredReport);
+  expect(state.periods).toEqual(restoredPeriods);
+  await page.reload();
+  await expect(page.locator('input[name=openingPto]')).toHaveValue('123');
+  await expect(page.locator('.pop-settings-table tbody tr')).toHaveCount(1);
+  await expect(page.getByLabel('Birthday credit month')).toHaveCount(0);
   await nav(page, 'Calendar');
   await expect(page.locator('.calendar-logged')).toHaveCount(2);
 });
@@ -83,15 +110,44 @@ test('sample JSON import and export work offline with zero Supabase requests', a
   await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeEnabled();
   await page.context().setOffline(true);
   await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'sample.json', mimeType: 'application/json', buffer: Buffer.from('[{"date":"2026-10-22","totalHours":4.1}]') });
+  await expect(page.getByText('This older file is incomplete.', { exact: false })).toBeVisible();
+  await page.getByLabel('Replace all data in 2026 sample data with this file.').check();
   await page.getByRole('button', { name: 'Import JSON', exact: true }).click();
-  await expect(page.locator('.data-transfer-settings').getByRole('status')).toContainText('Imported 1 missing entries');
+  await expect(page.locator('.data-transfer-settings').getByRole('status')).toContainText('Replaced this workspace with 1 time entries');
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
   const download = await downloading;
   const backup = JSON.parse(await readFile((await download.path())!, 'utf8'));
   expect(backup.dataset).toBe('sample2026');
-  expect(backup.logs).toHaveLength(150);
+  expect(backup.logs).toHaveLength(1);
+  expect(backup.periods).toHaveLength(24);
   expect(state.requests).toHaveLength(0);
+});
+
+test('POP names, dates and funding persist, update summaries, and stay isolated from sample data', async ({ page }) => {
+  const state = await backend(page);
+  await page.goto('/?view=settings');
+  await page.getByRole('button', { name: 'Edit POP Q', exact: true }).click();
+  const editor = page.getByRole('form', { name: 'Edit POP' });
+  await editor.getByLabel('POP name').fill('Custom Q');
+  await editor.getByLabel('End date').fill('2026-11-30');
+  await editor.getByLabel('Funded hours').fill('800');
+  state.failWrite = true;
+  await page.getByRole('button', { name: 'Save POP', exact: true }).click();
+  await expect(page.locator('.pop-settings').getByRole('alert')).toContainText('Simulated connection failure');
+  await expect(editor.getByLabel('POP name')).toHaveValue('Custom Q');
+  state.failWrite = false;
+  await page.getByRole('button', { name: 'Save POP', exact: true }).click();
+  await expect(page.locator('.pop-settings').getByRole('status')).toContainText('POP definitions saved');
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Edit Custom Q', exact: true })).toBeVisible();
+  await nav(page, 'POP');
+  await expect(page.locator('[data-pop=pop-q]')).toContainText('Custom Q');
+  await expect(page.locator('[data-pop=pop-q]')).toContainText('800.0');
+  await nav(page, 'Settings');
+  await page.locator('input[value=sample2026]').check();
+  await expect(page.getByRole('button', { name: 'Edit POP Q', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit Custom Q', exact: true })).toHaveCount(0);
 });
 
 test('fresh personal visits require sign-in and never use legacy browser records automatically', async ({ page }) => {

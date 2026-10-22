@@ -87,15 +87,15 @@ describe('Monthly work and leave summary', () => {
     expect(report.rows[10]).toMatchObject({ workHours: 144, usedPto: 8, accruedPto: 12.25 });
   });
 
-  it('carries balances across year boundaries and only credits the configured birthday month', () => {
+  it('carries balances across year boundaries and always credits birthday leave in January', () => {
     const state = createDefaultMonthlyReport(2025);
     state.settings = { ...state.settings, openingMonth: '2025-12', openingPto: 100, openingHoliday: 10, openingBirthday: 5 };
     const report = buildMonthlySummary([log('2025-12-01', 8), log('2026-01-02', 8)], state, 2026, '2026-01-31');
     expect(report.currentBalance).toEqual({ pto: -218.64, holiday: 10, birthday: 13, total: -195.64 });
-    state.settings.birthdayMonth = 5;
+    Object.assign(state.settings, { birthdayMonth: 5 }); // Old backups cannot change the January policy.
     const mayBirthday = buildMonthlySummary([], state, 2026, '2026-05-01');
-    expect(mayBirthday.rows[0].accruedBirthday).toBe(0);
-    expect(mayBirthday.rows[4].accruedBirthday).toBe(8);
+    expect(mayBirthday.rows[0].accruedBirthday).toBe(8);
+    expect(mayBirthday.rows[4].accruedBirthday).toBe(0);
     expect(mayBirthday.currentBalance!.birthday).toBe(13);
   });
 
