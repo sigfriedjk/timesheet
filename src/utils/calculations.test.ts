@@ -8,6 +8,7 @@ import {
   calculateTargetTimeOut,
   formatDurationMinutes,
   getShiftScenarios,
+  normalizeTimeInput,
 } from './calculations';
 
 describe('Calculations & Precision Rules (Section 6)', () => {
@@ -140,6 +141,12 @@ describe('Departure scenarios', () => {
 });
 
 describe('24-hour entries and tenth-hour breaks', () => {
+  it('normalizes compact valid times while preserving invalid entries for correction', () => {
+    for (const [typed, formatted] of [['1025', '10:25'], ['925', '09:25'], ['0000', '00:00'], ['2359', '23:59'], ['8:05', '08:05'], ['10:25', '10:25']]) {
+      expect(normalizeTimeInput(typed)).toBe(formatted);
+    }
+    for (const typed of ['', '24:00', '2460', '2360', '25', 'abc', '8:5']) expect(normalizeTimeInput(typed)).toBe(typed);
+  });
   it('rejects incomplete, out-of-range, or 12-hour time entries', () => {
     for (const value of ['1', '12:', '8:00', '08:60', '24:00', '16:30 PM', '08:00junk', '08:30:00']) {
       expect(timeStringToMinutes(value)).toBeNull();

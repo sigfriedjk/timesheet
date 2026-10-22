@@ -106,7 +106,7 @@ export const App: React.FC = () => {
       {/* Main Content Area */}
       <main className="main-content">
         <div className="content-container" key={viewIdentity}>
-          {currentTab !== 'settings' && !workspace.ready && <SupabaseAccess connection={connection} workspace={workspace} onOpenSettings={() => setCurrentTab('settings')} />}
+          {currentTab !== 'settings' && !workspace.ready && <SupabaseAccess connection={connection} workspace={workspace} />}
           {workspace.ready && currentTab === 'calculator' && (
             <DailyCalculator
               onLogSaved={handleLogSaved}
@@ -125,9 +125,9 @@ export const App: React.FC = () => {
             />
           )}
 
-          {workspace.ready && currentTab === 'monthly' && <MonthlySummaryView key={dataset} logs={logs} state={reportState} isSample={dataset === 'sample2026'} onChange={workspace.saveReport} onOpenSettings={() => setCurrentTab('settings')} />}
+          {workspace.ready && currentTab === 'monthly' && <MonthlySummaryView key={dataset} logs={logs} state={reportState} isSample={dataset === 'sample2026'} onChange={workspace.saveReport} />}
 
-          {workspace.ready && currentTab === 'pop' && <PopSummaryView key={dataset} logs={logs} periods={workspace.periods} isSample={dataset === 'sample2026'} onOpenSettings={() => setCurrentTab('settings')} />}
+          {workspace.ready && currentTab === 'pop' && <PopSummaryView key={dataset} logs={logs} periods={workspace.periods} isSample={dataset === 'sample2026'} />}
 
           {currentTab === 'settings' && (
             <SettingsView

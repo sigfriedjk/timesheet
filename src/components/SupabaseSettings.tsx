@@ -29,7 +29,7 @@ export const SupabaseSignIn: React.FC<{ connection: SupabaseConnection }> = ({ c
   </form>;
 };
 
-export const SupabaseAccess: React.FC<{ connection: SupabaseConnection; workspace: Workspace; onOpenSettings: () => void }> = ({ connection, workspace, onOpenSettings }) => <section className="calculator-card supabase-access">
+export const SupabaseAccess: React.FC<{ connection: SupabaseConnection; workspace: Workspace }> = ({ connection, workspace }) => <section className="calculator-card supabase-access">
   <h2>{connection.session ? 'Your Supabase timesheet' : 'Sign in to your timesheet'}</h2>
   {!connection.config ? <p>Connect your Supabase project in Settings to use your personal timesheet.</p>
     : !connection.authReady ? <p role="status">Checking your sign-in…</p>
@@ -37,7 +37,6 @@ export const SupabaseAccess: React.FC<{ connection: SupabaseConnection; workspac
     : workspace.error ? <><p className="form-error" role="alert">{workspace.error}</p><p>Check your connection and the database setup in Settings, then try again.</p><button type="button" className="btn-primary" onClick={workspace.reload}>Retry loading data</button></>
     : <p role="status">Loading your timesheet…</p>}
   {connection.error && <p className="form-error" role="alert">{connection.error}</p>}
-  <button type="button" className="btn-secondary" onClick={onOpenSettings}>Open Settings</button>
 </section>;
 
 export const SupabaseSettings: React.FC<{ connection: SupabaseConnection; workspace: Workspace; isSample: boolean }> = ({ connection, workspace, isSample }) => {
