@@ -1,10 +1,11 @@
 import { expect, test, Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { POP_PERIODS } from '../../src/config/periodsOfPerformance';
+import { MonthlyReportState } from '../../src/types';
 
 const HOST = 'https://yiqquogdutgujsacoezh.supabase.co';
 const A = '11111111-1111-4111-8111-111111111111';
-const report = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100, autoPto: true }, entries: [], projectedWork: {} };
+const report: MonthlyReportState = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100, autoPto: true }, entries: [], projectedWork: {} };
 const entry = (date = '2026-10-01', hours = 8, notes = 'cloud entry') => ({ user_id: A, id: date, date, total_hours: hours, notes, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' });
 async function backend(page: Page, signedIn = true) {
   const state = { logs: [entry()], report, periods: POP_PERIODS.map(period => ({ ...period })), failRead: false, failWrite: false, delay: 0, requests: [] as { path: string; method: string; body: any }[] };
@@ -219,20 +220,93 @@ test('day editor stays open on failure and closes after an acknowledged save; de
   await expect(page.locator('.calendar-logged')).toHaveCount(0);
 });
 
+test('monthly summary trims zeros, collapses accruals, and edits the five saved totals', async ({ page }) => {
+  const state = await backend(page);
+  state.report = { ...report, entries: [
+    { id: 'pto', date: '2026-10-01', category: 'pto', hours: 8, notes: 'Existing date and note' },
+    { id: 'holiday', date: '2026-10-12', category: 'holiday', hours: 8.1 },
+    { id: 'birthday', date: '2026-10-01', category: 'birthday', hours: 8.11 },
+    { id: 'other-month', date: '2026-09-01', category: 'pto', hours: 4 },
+  ], projectedWork: { '2026-11': 123.4 } };
+  await page.goto('/?view=monthly');
+  await page.getByLabel('Actuals through').fill('2026-12-31');
+  const table = page.locator('.monthly-table');
+  await expect(table.getByRole('columnheader', { name: '12m avg', exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-stat=rolling-average]')).toHaveCount(0);
+  await expect(table.getByRole('columnheader', { name: 'Total', exact: true })).toHaveCount(0);
+  await expect(table.locator('tbody tr').first().locator('td')).toHaveCount(14);
+  await expect(page.getByRole('button', { name: 'Show accrued', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await page.getByRole('button', { name: 'Show accrued', exact: true }).click();
+  await expect(table.getByRole('columnheader', { name: 'Accrued', exact: true })).toBeVisible();
+  await expect(table.locator('tbody tr').first().locator('td')).toHaveCount(17);
+  await page.getByRole('button', { name: 'Hide accrued', exact: true }).click();
+  await expect(table.getByRole('columnheader', { name: 'Accrued', exact: true })).toHaveCount(0);
+  expect(await table.locator('tbody td, tfoot td').allTextContents()).not.toEqual(expect.arrayContaining([expect.stringMatching(/\.\d*0$/)]));
+  const october = page.locator('[data-month="2026-10"]');
+  await expect(october.locator('td').nth(6)).toHaveText('8');
+  await expect(october.locator('td').nth(7)).toHaveText('8.1');
+  await expect(october.locator('td').nth(8)).toHaveText('8.11');
+  await page.getByRole('button', { name: 'Edit October 2026 leave', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const editor = page.getByRole('form', { name: 'October 2026' });
+  await expect(editor.locator('input')).toHaveCount(5);
+  await expect(editor.getByLabel('PTO entered', { exact: true })).toHaveValue('8');
+  await expect(editor.getByLabel('Holiday entered', { exact: true })).toHaveValue('8.1');
+  await expect(editor.getByLabel('Birthday entered', { exact: true })).toHaveValue('8.11');
+  await editor.getByLabel('Overhead entered', { exact: true }).fill('2');
+  await editor.getByLabel('PTO adjustment', { exact: true }).fill('-1.25');
+  await editor.getByRole('button', { name: 'Save month', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  expect(state.report.entries).toEqual(expect.arrayContaining([
+    { id: 'pto', date: '2026-10-01', category: 'pto', hours: 8, notes: 'Existing date and note' },
+    { id: 'other-month', date: '2026-09-01', category: 'pto', hours: 4 },
+    expect.objectContaining({ category: 'overhead', hours: 2 }),
+    expect.objectContaining({ category: 'adjustment', hours: -1.25 }),
+  ]));
+  expect(state.report.projectedWork).toEqual({ '2026-11': 123.4 });
+  await page.reload();
+  await page.getByRole('button', { name: 'Edit October 2026 leave', exact: true }).click();
+  await expect(editor.getByLabel('PTO adjustment', { exact: true })).toHaveValue('-1.25');
+  await editor.getByLabel('PTO entered', { exact: true }).fill('99');
+  await editor.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit October 2026 leave', exact: true }).click();
+  await expect(editor.getByLabel('PTO entered', { exact: true })).toHaveValue('8');
+});
+
+test('monthly editor separates automatic leave from saved zero and clearing restores inference', async ({ page }) => {
+  const state = await backend(page);
+  await page.goto('/?view=monthly');
+  const february = page.locator('[data-month="2026-02"] .used-pto');
+  await expect(february).not.toHaveText('0');
+  await page.getByRole('button', { name: 'Edit February 2026 leave', exact: true }).click();
+  const editor = page.getByRole('form', { name: 'February 2026' });
+  await expect(editor.getByLabel('PTO entered', { exact: true })).toHaveValue('');
+  await editor.getByLabel('PTO entered', { exact: true }).fill('0');
+  await editor.getByRole('button', { name: 'Save month', exact: true }).click();
+  await expect(february).toHaveText('0');
+  expect(state.report.entries).toEqual([expect.objectContaining({ category: 'pto', hours: 0 })]);
+  await page.getByRole('button', { name: 'Edit February 2026 leave', exact: true }).click();
+  await editor.getByLabel('PTO entered', { exact: true }).fill('');
+  await editor.getByRole('button', { name: 'Save month', exact: true }).click();
+  await expect(february).not.toHaveText('0');
+  expect(state.report.entries).toHaveLength(0);
+});
+
 test('report and leave settings preserve drafts on failure and persist on retry', async ({ page }) => {
   const state = await backend(page);
   await page.goto('/?view=monthly');
-  await page.getByRole('button', { name: 'Edit October 2026 leave and projection' }).click();
-  await page.getByRole('dialog').getByLabel('Note', { exact: true }).fill('leave draft');
+  await page.getByRole('button', { name: 'Edit October 2026 leave', exact: true }).click();
+  const editor = page.getByRole('form', { name: 'October 2026' });
+  await editor.getByLabel('PTO entered', { exact: true }).fill('8.11');
   state.failWrite = true;
-  await page.getByRole('button', { name: 'Add entry', exact: true }).click();
-  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Simulated');
-  await expect(page.getByRole('dialog').getByLabel('Note', { exact: true })).toHaveValue('leave draft');
+  await editor.getByRole('button', { name: 'Save month', exact: true }).click();
+  await expect(editor.getByRole('alert')).toContainText('Simulated');
+  await expect(editor.getByLabel('PTO entered', { exact: true })).toHaveValue('8.11');
+  expect(state.report.entries).toHaveLength(0);
   state.failWrite = false;
-  await page.getByRole('button', { name: 'Add entry', exact: true }).click();
-  await expect(page.getByRole('dialog').getByRole('status')).toContainText('PTO entry saved');
-  await expect(page.getByRole('dialog').getByLabel('Note', { exact: true })).toHaveValue('');
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await editor.getByRole('button', { name: 'Save month', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  expect(state.report.entries).toEqual([expect.objectContaining({ date: '2026-10-22', category: 'pto', hours: 8.11 })]);
   await nav(page, 'Settings');
   await page.locator('input[name=openingPto]').fill('75.25');
   state.failWrite = true;
