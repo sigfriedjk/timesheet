@@ -3,6 +3,7 @@ import { TimeLog } from '../types';
 import { Calendar as CalendarIcon, Trash2, Edit3, Plus, X } from 'lucide-react';
 import { MONTH_NAMES, WEEKDAY_NAMES, getFederalHolidays, getMonthCells, getMonthSummary } from '../utils/calendar';
 import { roundToTenth } from '../utils/calculations';
+import { formatNumber } from '../utils/format';
 
 interface CalendarViewProps {
   logs: TimeLog[];
@@ -42,7 +43,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           </div>
         </div>
         <div className="kpi-card"><span className="kpi-label">Logged days</span><span className="kpi-value">{yearlyLogs.filter((log) => log.totalHours > 0).length}</span></div>
-        <div className="kpi-card"><span className="kpi-label">Logged hours</span><span className="kpi-value">{totalYearHours.toFixed(1)}</span></div>
+        <div className="kpi-card"><span className="kpi-label">Logged hours</span><span className="kpi-value">{formatNumber(totalYearHours, 1)}</span></div>
       </div>
 
       <div className="calendar-legend" aria-label="Calendar legend">
@@ -55,19 +56,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           const summary = getMonthSummary(yearlyLogs, selectedYear, month);
           return (
             <section key={month} className="month-calendar calculator-card" aria-label={`${monthName} ${selectedYear}`}>
-              <div className="month-heading"><h3>{monthName}</h3><span>{summary.hours.toFixed(1)} h</span></div>
+              <div className="month-heading"><h3>{monthName}</h3><span>{formatNumber(summary.hours, 1)} h</span></div>
               <div className="month-weekdays" aria-hidden="true">{WEEKDAY_NAMES.map((day) => <span key={day}>{day}</span>)}</div>
               <div className="month-days">
                 {getMonthCells(selectedYear, month).map((day, index) => {
                   if (!day) return <span className="calendar-padding" key={`blank-${index}`} aria-hidden="true" />;
                   const log = logsByDate.get(day.date);
-                  const label = `${monthName} ${day.day}, ${selectedYear}: ${log ? `${log.totalHours.toFixed(1)} hours` : 'no entry'}${day.holiday ? `; ${day.holiday}` : ''}`;
+                  const label = `${monthName} ${day.day}, ${selectedYear}: ${log ? `${formatNumber(log.totalHours, 1)} hours` : 'no entry'}${day.holiday ? `; ${day.holiday}` : ''}`;
                   return (
                     <button key={day.date} type="button" onClick={() => setSelectedDate(day.date)}
                       className={`calendar-day${day.isWeekend ? ' calendar-weekend' : ''}${day.holiday ? ' calendar-holiday' : ''}${log ? ' calendar-logged' : ''}`}
                       aria-label={label} title={`${label}${log?.notes ? `; ${log.notes}` : ''}`}>
                       <span className="calendar-date">{day.day}{day.holiday && <span className="holiday-marker" aria-hidden="true">•</span>}</span>
-                      <span className="calendar-hours">{log ? log.totalHours.toFixed(1) : '—'}</span>
+                      <span className="calendar-hours">{log ? formatNumber(log.totalHours, 1) : '—'}</span>
                     </button>
                   );
                 })}
@@ -89,7 +90,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               const date = new Date(`${log.date}T12:00:00`);
               const weekend = date.getDay() === 0 || date.getDay() === 6;
               return <tr key={log.id} className={`${weekend ? 'weekend-row' : ''} ${holidays[log.date] ? 'holiday-row' : ''}`}>
-                <td>{log.date}</td><td>{date.toLocaleDateString('en-US', { weekday: 'short' })}</td><td><span className="hours-badge">{log.totalHours.toFixed(1)}</span></td>
+                <td>{log.date}</td><td>{date.toLocaleDateString('en-US', { weekday: 'short' })}</td><td><span className="hours-badge">{formatNumber(log.totalHours, 1)}</span></td>
                 <td>{holidays[log.date] ? <span className="badge badge-holiday">{holidays[log.date]}</span> : '—'}</td><td className="log-notes-cell">{log.notes || '—'}</td>
                 <td><div className="row-actions"><button type="button" className="btn-icon" onClick={() => setSelectedDate(log.date)} aria-label={`Edit ${log.date}`}><Edit3 size={16} /></button><button type="button" className="btn-icon btn-danger" disabled={deleting} onClick={() => void remove(log.date)} aria-label={`Delete ${log.date}`}><Trash2 size={16} /></button></div></td>
               </tr>;
@@ -106,7 +107,7 @@ const DayEditor: React.FC<{ date: string; log?: TimeLog; holiday?: string; onSav
   const ref = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [hours, setHours] = useState(log?.totalHours.toFixed(1) ?? '8.0');
+  const [hours, setHours] = useState(log ? formatNumber(log.totalHours, 1) : '8');
   const [notes, setNotes] = useState(log?.notes ?? '');
   useEffect(() => { ref.current?.showModal(); }, []);
   return <dialog ref={ref} className="day-editor" aria-labelledby="day-editor-title" onClose={onClose} onCancel={event => { if (busy) event.preventDefault(); }}>

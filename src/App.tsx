@@ -11,6 +11,7 @@ import { SettingsView } from './components/SettingsView';
 import { PopSummaryView } from './components/PopSummaryView';
 import { MonthlySummaryView } from './components/MonthlySummaryView';
 import { CheckCircle2, X } from 'lucide-react';
+import { formatNumber } from './utils/format';
 
 interface ToastMessage {
   id: string;
@@ -46,7 +47,7 @@ export const App: React.FC = () => {
   const handleLogSaved = async (logData: TimeLog) => {
     const isOverwrite = logs.some(log => log.date === logData.date);
     const log = await workspace.saveLog(logData.date, logData.totalHours, logData.notes);
-    showToast(`${isOverwrite ? 'Updated' : 'Logged'} ${log.totalHours.toFixed(1)} hrs for ${log.date}`);
+    showToast(`${isOverwrite ? 'Updated' : 'Logged'} ${formatNumber(log.totalHours, 1)} hrs for ${log.date}`);
     setCurrentTab('calendar');
   };
 
@@ -59,7 +60,7 @@ export const App: React.FC = () => {
 
   const handleCalendarSave = async (date: string, hours: number, notes: string) => {
     await workspace.saveLog(date, hours, notes);
-    showToast(`Saved ${hours.toFixed(1)} hrs for ${date}`);
+    showToast(`Saved ${formatNumber(hours, 1)} hrs for ${date}`);
   };
 
   const useSampleData = () => {
@@ -144,13 +145,6 @@ export const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Footer */}
-      {currentTab !== 'calendar' && currentTab !== 'monthly' && currentTab !== 'pop' && <footer className="app-footer">
-        <div className="footer-container">
-          <span>Work Hours Tracker &bull; Node.js + Vite + TypeScript &bull; GitHub Pages Static Architecture</span>
-          <span className="footer-spec">Conforms to Design Document v1.0 (0.1hr Work / 0.01hr Leave Precision)</span>
-        </div>
-      </footer>}
     </div>
   );
 };

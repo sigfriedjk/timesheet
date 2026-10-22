@@ -16,12 +16,8 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
 
 1. **Daily Calculator & Shift Projections (Interface 1):**
    * **Ephemeral Inputs:** In-memory calculation for `Date`, `Time In`, `Time Out` (required), and `Break Duration (mins)`, which defaults to zero. Shift labels sit beside their fields; compact time entries such as `1025` normalize to `10:25` on blur.
-   * **Real-Time Live Projections:** The Live Calculation card shows elapsed work using the current clock. Saving a shift requires its entered Time Out. The Out Target card’s **Use as Time Out** button copies its time into Shift Details.
-   * **Shift Target Cards:** Instant forecasting for:
-     * **8.0 hours** (Standard Shift)
-     * **9.6 hours** (9/80 Long Shift)
-     * **Custom Target** (User-adjustable goal)
-     * Real-time progress bars, countdowns ("Xh Ym remaining"), and target departure times.
+   * **Real-Time Live Projections:** The Live Calculation card shows elapsed work using the current clock. Saving a shift requires its entered Time Out. The Out Target card’s **Use as Time Out** button copies its displayed time into Today.
+   * **Out Target:** A combined hours/time-out pair includes a directional control pointing toward the editable field. The other field calculates from Time In and the break duration. Switching direction lets you enter either desired hours or a departure time, and **Use as Time Out** copies the displayed departure time into Today.
    * **Mandatory Precision & Rounding Rules:**
      * Work hours strictly maintained to the **nearest tenth of an hour** ($0.1$).
      * Leave accrual formulas prepared to the **nearest hundredth of an hour** ($0.01$).
@@ -37,7 +33,7 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
    * Isolated 2026 sample workspace with 149 entries, CSV/JSON downloads, reset, and a switch back to personal logs.
 
 3. **Monthly Work & Leave Summary:**
-   * A continuous month/year table, defaulting to All Years, with actual work, remaining work forecasts, trailing 12-month totals, collapsible accrued leave, used/planned leave, and separate PTO/holiday/birthday balances. Numbers omit trailing decimal zeros.
+   * A continuous month/year table, defaulting to All Years, with actual work, remaining work forecasts, trailing 12-month totals, collapsible accrued leave, used/planned leave, and separate PTO/holiday/birthday balances. Numbers omit trailing decimal zeros across Monthly Summary, the 12-month Calendar, and POP Summary.
    * Today’s date keeps future logs and projected work separate from recorded hours. Monthly work overrides and dated planned leave recalculate forecasts without changing daily logs.
    * **Settings → Leave & forecasts** configures opening balances/month, future work rate (94.3% by default), and historical PTO gap-filling (enabled by default). Birthday credit is always in January. Historical and forecast PTO cover weekday shortfalls after work and other leave, including empty months.
    * Work-hour and leave precision remain 0.1 and 0.01 hours respectively. Weekday hours in this table include holidays; holiday credits are tracked separately, following the reference workbook's structure.
@@ -163,7 +159,7 @@ Outputs static production assets to `./dist/`, ready for direct deployment to Gi
 
 ## Monthly Summary Workflow
 
-Open the Monthly Summary tab or use `?view=monthly` (`?sample=2026&view=monthly` for the sample workspace). Monthly and POP summaries automatically use the current local date for actual work and leave, including in sample mode. Open reports refresh at midnight and when returning to the tab. All Years is the default period; use the year selector to narrow the view. Each row includes its month and year. The range starts at the earliest opening month, log, leave entry, or work override and extends through the end of the latest saved/current year, including empty months. The cards total the selected period and show separate PTO/holiday/birthday balances. Both summary tables display every row and use page scrolling vertically.
+Open the Monthly Summary tab or use `?view=monthly` (`?sample=2026&view=monthly` for the sample workspace). Monthly and POP summaries automatically use the current local date for actual work and leave, including in sample mode. Open reports refresh at midnight and when returning to the tab. All Years is the default period; use the year selector to narrow the view. Each row includes its month and year. The current month is highlighted in amber and future months in blue. The range starts at the earliest opening month, log, leave entry, or work override and extends through the end of the latest saved/current year, including empty months. The cards total the selected period and show separate PTO/holiday/birthday balances. Both summary tables display every row and use page scrolling vertically.
 
 Opening balances default to zero at January of the current year (January 2026 for the sample). Enter the correct starting PTO, holiday, and birthday balances in Settings. Balances carry across years; the report shows unavailable balances before the configured opening month.
 
