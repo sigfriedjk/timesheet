@@ -8,13 +8,20 @@ interface CalendarViewProps {
   logs: TimeLog[];
   isSample: boolean;
   onNavigateToCalculator: () => void;
-  onDeleteLog: (date: string) => void;
-  onSaveLog: (date: string, hours: number, notes: string) => void;
+  onDeleteLog: (date: string) => Promise<void>;
+  onSaveLog: (date: string, hours: number, notes: string) => Promise<void>;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
   logs, isSample, onNavigateToCalculator, onDeleteLog, onSaveLog,
 }) => {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
+  const remove = async (date: string) => {
+    if (deleting) return;
+    setDeleting(true); setError('');
+    try { await onDeleteLog(date); } catch (error) { setError(error instanceof Error ? error.message : 'Could not delete entry.'); } finally { setDeleting(false); }
+  };
   const [selectedYear, setSelectedYear] = useState(isSample ? 2026 : new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const yearlyLogs = logs.filter((log) => log.date.startsWith(`${selectedYear}-`)).sort((a, b) => b.date.localeCompare(a.date));
@@ -24,6 +31,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   return (
     <div className="calendar-view">
+      {error && <p className="form-error" role="alert">{error}</p>}
       <div className="calendar-kpi-strip">
         <div className="kpi-card">
           <span className="kpi-label">Year</span>
@@ -83,31 +91,41 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               return <tr key={log.id} className={`${weekend ? 'weekend-row' : ''} ${holidays[log.date] ? 'holiday-row' : ''}`}>
                 <td>{log.date}</td><td>{date.toLocaleDateString('en-US', { weekday: 'short' })}</td><td><span className="hours-badge">{log.totalHours.toFixed(1)}</span></td>
                 <td>{holidays[log.date] ? <span className="badge badge-holiday">{holidays[log.date]}</span> : '—'}</td><td className="log-notes-cell">{log.notes || '—'}</td>
-                <td><div className="row-actions"><button type="button" className="btn-icon" onClick={() => setSelectedDate(log.date)} aria-label={`Edit ${log.date}`}><Edit3 size={16} /></button><button type="button" className="btn-icon btn-danger" onClick={() => onDeleteLog(log.date)} aria-label={`Delete ${log.date}`}><Trash2 size={16} /></button></div></td>
+                <td><div className="row-actions"><button type="button" className="btn-icon" onClick={() => setSelectedDate(log.date)} aria-label={`Edit ${log.date}`}><Edit3 size={16} /></button><button type="button" className="btn-icon btn-danger" disabled={deleting} onClick={() => void remove(log.date)} aria-label={`Delete ${log.date}`}><Trash2 size={16} /></button></div></td>
               </tr>;
             })}</tbody>
           </table></div>
         )}
       </div>
-      {selectedDate && <DayEditor key={selectedDate} date={selectedDate} log={logsByDate.get(selectedDate)} holiday={holidays[selectedDate]} onClose={() => setSelectedDate(null)} onSave={(hours, notes) => { onSaveLog(selectedDate, hours, notes); setSelectedDate(null); }} />}
+      {selectedDate && <DayEditor key={selectedDate} date={selectedDate} log={logsByDate.get(selectedDate)} holiday={holidays[selectedDate]} onClose={() => setSelectedDate(null)} onSave={(hours, notes) => onSaveLog(selectedDate, hours, notes)} />}
     </div>
   );
 };
 
-const DayEditor: React.FC<{ date: string; log?: TimeLog; holiday?: string; onSave: (hours: number, notes: string) => void; onClose: () => void }> = ({ date, log, holiday, onSave, onClose }) => {
+const DayEditor: React.FC<{ date: string; log?: TimeLog; holiday?: string; onSave: (hours: number, notes: string) => Promise<void>; onClose: () => void }> = ({ date, log, holiday, onSave, onClose }) => {
   const ref = useRef<HTMLDialogElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const [hours, setHours] = useState(log?.totalHours.toFixed(1) ?? '8.0');
   const [notes, setNotes] = useState(log?.notes ?? '');
   useEffect(() => { ref.current?.showModal(); }, []);
-  return <dialog ref={ref} className="day-editor" aria-labelledby="day-editor-title" onClose={onClose}>
-    <form onSubmit={(event) => { event.preventDefault(); ref.current?.close(); onSave(Number(hours), notes); }}>
+  return <dialog ref={ref} className="day-editor" aria-labelledby="day-editor-title" onClose={onClose} onCancel={event => { if (busy) event.preventDefault(); }}>
+    <form onSubmit={async event => {
+      event.preventDefault();
+      if (busy) return;
+      setBusy(true); setError('');
+      try { await onSave(Number(hours), notes); ref.current?.close(); }
+      catch (error) { setError(error instanceof Error ? error.message : 'Could not save your hours.'); }
+      finally { setBusy(false); }
+    }}><fieldset className="async-fields" disabled={busy}>
       <div className="table-header-row"><h3 id="day-editor-title">{date}</h3><button type="button" className="btn-icon" onClick={() => ref.current?.close()} aria-label="Close day editor"><X size={18} /></button></div>
       {holiday && <p className="badge-holiday">{holiday}</p>}
       <label className="form-label" htmlFor="day-hours">Total hours</label>
       <input id="day-hours" className="form-input" type="number" value={hours} onChange={(event) => setHours(event.target.value)} min="0" max="24" step="0.1" required autoFocus />
       <label className="form-label" htmlFor="day-notes">Notes</label>
       <textarea id="day-notes" className="form-textarea" rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} />
-      <div className="sample-actions"><button type="button" className="btn-secondary" onClick={() => ref.current?.close()}>Cancel</button><button type="submit" className="btn-primary">Save hours</button></div>
-    </form>
+      <div className="sample-actions"><button type="button" className="btn-secondary" onClick={() => ref.current?.close()}>Cancel</button><button type="submit" className="btn-primary">{busy ? 'Saving…' : 'Save hours'}</button></div>
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </fieldset></form>
   </dialog>;
 };

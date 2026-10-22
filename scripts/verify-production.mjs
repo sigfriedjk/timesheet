@@ -2,18 +2,20 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { EnvHttpProxyAgent, fetch } from 'undici';
 
 const site = new URL(process.argv[2] || 'https://sigfriedjk.github.io/timesheet/');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const report = { site: site.href, checkedAt: new Date().toISOString(), responses: [], pages: [] };
 const output = path.resolve('work/production-check');
+const dispatcher = new EnvHttpProxyAgent();
 await fs.mkdir(output, { recursive: true });
 
 async function get(url) {
   let lastError;
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(20000), redirect: 'follow' });
+      const response = await fetch(url, { dispatcher, signal: AbortSignal.timeout(20000), redirect: 'follow' });
       const body = await response.text();
       const contentType = response.headers.get('content-type') || '';
       console.log(`HTTP ${response.status} ${url} (${contentType})`);
@@ -45,14 +47,23 @@ try {
     if (!/javascript|text\/css/.test(result.contentType)) throw new Error(`Wrong asset content type: ${asset}`);
   }
 
-  const chrome = ['google-chrome', 'chromium', 'chromium-browser'].map(name => {
+  const chrome = process.env.CHROME_PATH || ['google-chrome', 'chromium', 'chromium-browser'].map(name => {
     const found = spawnSync('which', [name], { encoding: 'utf8' });
     return found.status === 0 ? found.stdout.trim() : null;
   }).find(Boolean);
   if (!chrome) throw new Error('Chrome/Chromium is required for the production browser check');
   profile = await fs.mkdtemp(path.join(os.tmpdir(), 'timesheet-smoke-'));
   let stderr = '';
-  browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const proxy = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy;
+  const proxyArgs = [];
+  if (proxy) {
+    const proxyUrl = new URL(proxy);
+    if (proxyUrl.username || proxyUrl.password) throw new Error('Chrome requires a proxy without credentials in its URL.');
+    // Chrome does not inherit HTTP(S)_PROXY. Preserve the managed egress path;
+    // its default loopback bypass still allows a local production preview.
+    proxyArgs.push(`--proxy-server=${proxyUrl.origin}`);
+  }
+  browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', ...proxyArgs, '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   browser.stderr.on('data', data => { stderr += data.toString(); });
   let endpoint;
   for (let i = 0; i < 150; i++) {
@@ -66,9 +77,12 @@ try {
   await new Promise((resolve, reject) => { ws.addEventListener('open', resolve, { once: true }); ws.addEventListener('error', reject, { once: true }); });
   const exceptions = [];
   const networkErrors = [];
+  let checkingSample = false;
+  const sampleSupabaseRequests = [];
   ws.addEventListener('message', ({ data }) => {
     const message = JSON.parse(data);
     if (message.method === 'Runtime.exceptionThrown') exceptions.push(message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text);
+    if (checkingSample && message.method === 'Network.requestWillBeSent' && /\.supabase\.co(?:\/|$)/.test(message.params.request.url)) sampleSupabaseRequests.push(message.params.request.url);
     if (message.method === 'Network.loadingFailed') networkErrors.push(message.params.errorText);
     if (!message.id) return;
     const item = pending.get(message.id);
@@ -94,11 +108,12 @@ try {
     return result.result.value;
   };
   for (const [name, url, selector] of [
-    ['normal', site.href, '.calculator-view'],
+    ['normal', site.href, '.supabase-access'],
     ['sample', new URL('?sample=2026', site).href, '.year-calendar'],
     ['monthly', new URL('?sample=2026&view=monthly', site).href, '.monthly-view'],
     ['pop', new URL('?sample=2026&view=pop', site).href, '.pop-view'],
   ]) {
+    checkingSample = name !== 'normal';
     await send('Page.navigate', { url }, sessionId);
     let ready = false;
     for (let i = 0; i < 200; i++) {
@@ -138,6 +153,9 @@ try {
   if (!await evaluate(`!!document.querySelector('.settings-view input[value=sample2026]:checked') && !!document.querySelector('.settings-view .sample-coverage')`)) throw new Error('Settings is missing the active sample selection or coverage/downloads');
   if (!await evaluate(`document.querySelector('input[name=autoPto]')?.checked === true`)) throw new Error('Automatic historical PTO must be enabled by default');
   if (!await evaluate(`document.querySelectorAll('.pop-settings-table tbody tr').length === 24 && document.querySelector('[data-period="pop-x"]').textContent.includes('2027-06-30')`)) throw new Error('Settings must list all 24 fixed POP ranges');
+  if (sampleSupabaseRequests.length) throw new Error('Sample views made Supabase requests');
+  report.sampleIsolation = { supabaseRequests: sampleSupabaseRequests.length };
+  checkingSample = false;
   await evaluate(`document.querySelector('.dataset-selector input[value=personal]').click()`);
   for (let i = 0; i < 50 && !await evaluate(`!!document.querySelector('.settings-view input[value=personal]:checked')`); i++) await delay(100);
   if (!await evaluate(`!!document.querySelector('.settings-view input[value=personal]:checked') && !location.search.includes('sample')`)) throw new Error('Switching to personal data must stay in Settings and clear the sample query');
@@ -148,7 +166,7 @@ try {
   console.log('Chrome verified Settings sample controls and data-source switching.');
   if (exceptions.length) throw new Error(`Browser errors: ${exceptions.join('; ')}`);
   report.success = true;
-  console.log('Production HTTP, JavaScript/CSS, calculator, calendar, monthly report, POP report, and Settings checks passed.');
+  console.log('HTTP, JavaScript/CSS, sign-in gate, local sample calendar/monthly/POP, sample isolation, and Settings checks passed.');
 } catch (error) {
   report.success = false;
   report.error = error.message;
@@ -163,4 +181,5 @@ try {
     await Promise.race([new Promise(resolve => browser.once('exit', resolve)), delay(3000)]);
   }
   if (profile) await fs.rm(profile, { recursive: true, force: true, maxRetries: 3 }).catch(() => {});
+  await dispatcher.close();
 }

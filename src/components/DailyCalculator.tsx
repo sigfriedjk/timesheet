@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 interface DailyCalculatorProps {
-  onLogSaved: (log: TimeLog) => void;
+  onLogSaved: (log: TimeLog) => Promise<void>;
   existingLogs: TimeLog[];
 }
 
@@ -26,6 +26,8 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
   existingLogs,
 }) => {
   // Ephemeral inputs (in-memory only, per design document)
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const [date, setDate] = useState<string>(getTodayDateString());
   const [timeIn, setTimeIn] = useState<string>('08:00');
   const [timeOut, setTimeOut] = useState<string>('');
@@ -73,9 +75,12 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
     setTimeOut('');
   };
 
-  const handleLogSubmit = (e: React.FormEvent) => {
+  const handleLogSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = onLogSaved(
+    if (busy) return;
+    setBusy(true); setError('');
+    try {
+      await onLogSaved(
       {
         id: existingEntry?.id || '',
         date,
@@ -85,7 +90,8 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
         updatedAt: '',
       }
     );
-    return result;
+    } catch (error) { setError(error instanceof Error ? error.message : 'Could not save your hours.'); }
+    finally { setBusy(false); }
   };
 
   const isToday = date === getTodayDateString();
@@ -111,6 +117,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
           </h3>
 
           <form onSubmit={handleLogSubmit} className="calculator-form">
+            <fieldset className="async-fields" disabled={busy}>
             {/* Date Input */}
             <div className="form-group">
               <label htmlFor="log-date" className="form-label">
@@ -266,13 +273,15 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
 
             {/* Action Bar */}
             <div className="form-actions">
-              <button type="submit" className="btn-primary btn-large">
+              <button type="submit" className="btn-primary btn-large" disabled={busy}>
                 <CheckCircle2 size={20} />
-                <span>{existingEntry ? 'Overwrite & Log Time' : 'Log Time to Database'}</span>
+                <span>{busy ? 'Saving…' : existingEntry ? 'Overwrite & Log Time' : 'Log Time to Database'}</span>
                 <span className="btn-highlight">({workedCalc.roundedHours.toFixed(1)} hrs)</span>
               </button>
 
             </div>
+            {error && <p className="form-error" role="alert">{error}</p>}
+            </fieldset>
           </form>
         </section>
 

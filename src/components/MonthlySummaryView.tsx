@@ -11,7 +11,7 @@ interface Props {
   logs: TimeLog[];
   state: MonthlyReportState;
   isSample: boolean;
-  onChange: (state: MonthlyReportState) => void;
+  onChange: (state: MonthlyReportState) => Promise<void>;
   onOpenSettings: () => void;
 }
 const fixed = (value: number | null | undefined, digits = 2) => value == null ? '—' : value.toFixed(digits);
@@ -87,20 +87,29 @@ const MonthEditor: React.FC<{ row: MonthlyRow; asOf: string; state: MonthlyRepor
   const [hours, setHours] = useState('8.00');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const persist = async (next: MonthlyReportState, success: string, after?: () => void) => {
+    if (busy) return;
+    setBusy(true); setError(''); setStatus('');
+    try { await onChange(next); after?.(); setStatus(success); }
+    catch (error) { setError(error instanceof Error ? error.message : 'Could not save changes.'); }
+    finally { setBusy(false); }
+  };
   const entries = state.entries.filter(entry => entry.date.startsWith(`${row.key}-`)).sort((a, b) => a.date.localeCompare(b.date));
   useEffect(() => { ref.current?.showModal(); }, []);
   const automatic = () => {
     const projectedWork = { ...state.projectedWork };
     delete projectedWork[row.key];
-    onChange({ ...state, projectedWork }); setWork(''); setStatus('Automatic forecast restored.');
+    void persist({ ...state, projectedWork }, 'Automatic forecast restored.', () => setWork(''));
   };
-  return <dialog ref={ref} className="month-editor day-editor" aria-labelledby="month-editor-heading" onClose={onClose}>
+  return <dialog ref={ref} className="month-editor day-editor" aria-labelledby="month-editor-heading" onClose={onClose} onCancel={event => { if (busy) event.preventDefault(); }}>
+    <fieldset className="async-fields" disabled={busy}>
     <div className="table-header-row"><h3 id="month-editor-heading">{MONTH_NAMES[row.month]} {row.year}</h3><button type="button" className="btn-icon" onClick={() => ref.current?.close()} aria-label="Close month editor"><X size={18} /></button></div>
     {row.projected && <form className="month-projection-form" onSubmit={event => {
       event.preventDefault();
       if (work === '') { automatic(); return; }
-      onChange({ ...state, projectedWork: { ...state.projectedWork, [row.key]: Number(work) } });
-      setStatus('Monthly work projection saved.');
+      void persist({ ...state, projectedWork: { ...state.projectedWork, [row.key]: Number(work) } }, 'Monthly work projection saved.');
     }}>
       <label className="form-label" htmlFor="monthly-work-total">Projected total work hours</label>
       <input id="monthly-work-total" className="form-input" type="number" min={row.actualHours} max={Number(last.slice(-2)) * 24} step="0.1" value={work} placeholder={fixed(row.workHours, 1)} onChange={event => setWork(event.target.value)} />
@@ -110,8 +119,7 @@ const MonthEditor: React.FC<{ row: MonthlyRow; asOf: string; state: MonthlyRepor
     <h4>Add leave or adjustment</h4>
     <form className="leave-entry-form" onSubmit={event => {
       event.preventDefault();
-      onChange({ ...state, entries: [...state.entries, { id: generateId(), date, category, hours: Number(hours), notes: notes.trim() || undefined }] });
-      setNotes(''); setStatus(`${CATEGORY_NAMES[category]} entry saved.`);
+      void persist({ ...state, entries: [...state.entries, { id: generateId(), date, category, hours: Number(hours), notes: notes.trim() || undefined }] }, `${CATEGORY_NAMES[category]} entry saved.`, () => setNotes(''));
     }}>
       <div className="report-settings-grid">
         <label>Date<input className="form-input" type="date" value={date} min={`${row.key}-01`} max={last} onChange={event => setDate(event.target.value)} required /></label>
@@ -122,8 +130,9 @@ const MonthEditor: React.FC<{ row: MonthlyRow; asOf: string; state: MonthlyRepor
       <p className="settings-description">Dates after {asOf} are planned leave. A zero PTO entry overrides automatic historical PTO; zero holiday entries override automatic holiday usage.</p>
       <button type="submit" className="btn-primary">Add entry</button>
     </form>
-    <p className="settings-status" role="status">{status}</p>
-    {entries.length > 0 && <ul className="leave-entry-list" aria-label="Month leave entries">{entries.map(entry => <li key={entry.id}><div><strong>{entry.date} · {CATEGORY_NAMES[entry.category]} · {fixed(entry.hours)} h</strong><small>{entry.date > asOf ? 'Planned' : 'Entered'}{entry.notes ? ` · ${entry.notes}` : ''}</small></div><button type="button" className="btn-icon btn-danger" aria-label={`Delete ${entry.date} ${CATEGORY_NAMES[entry.category]} entry`} onClick={() => onChange({ ...state, entries: state.entries.filter(item => item.id !== entry.id) })}><Trash2 size={16} /></button></li>)}</ul>}
+    <p className="settings-status" role="status">{busy ? 'Saving…' : status}</p>{error && <p className="form-error" role="alert">{error}</p>}
+    {entries.length > 0 && <ul className="leave-entry-list" aria-label="Month leave entries">{entries.map(entry => <li key={entry.id}><div><strong>{entry.date} · {CATEGORY_NAMES[entry.category]} · {fixed(entry.hours)} h</strong><small>{entry.date > asOf ? 'Planned' : 'Entered'}{entry.notes ? ` · ${entry.notes}` : ''}</small></div><button type="button" className="btn-icon btn-danger" aria-label={`Delete ${entry.date} ${CATEGORY_NAMES[entry.category]} entry`} onClick={() => void persist({ ...state, entries: state.entries.filter(item => item.id !== entry.id) }, 'Leave entry deleted.')}><Trash2 size={16} /></button></li>)}</ul>}
     <button type="button" className="btn-secondary" onClick={() => ref.current?.close()}>Done</button>
+    </fieldset>
   </dialog>;
 };

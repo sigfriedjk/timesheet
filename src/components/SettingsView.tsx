@@ -5,11 +5,16 @@ import { LeavePolicyForm } from './LeavePolicyForm';
 import { MONTH_NAMES } from '../utils/calendar';
 import { SAMPLE_MONTH_NOTES, createSampleTimeLogs2026, sampleDataCsv } from '../services/sampleData';
 import { POP_PERIODS } from '../config/periodsOfPerformance';
+import { SupabaseSettings } from './SupabaseSettings';
+import { SupabaseConnection } from '../hooks/useSupabaseConnection';
+import { Workspace } from '../hooks/useWorkspace';
 
 interface SettingsViewProps {
   isSample: boolean;
   leaveSettings: LeaveSettings;
-  onSaveLeaveSettings: (settings: LeaveSettings) => void;
+  onSaveLeaveSettings: (settings: LeaveSettings) => Promise<void>;
+  connection: SupabaseConnection;
+  workspace: Workspace;
   onUseSample: () => void;
   onUsePersonal: () => void;
   onResetSample: () => number;
@@ -26,11 +31,12 @@ function downloadFile(name: string, data: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ isSample, leaveSettings, onSaveLeaveSettings, onUseSample, onUsePersonal, onResetSample }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ isSample, leaveSettings, onSaveLeaveSettings, onUseSample, onUsePersonal, onResetSample, connection, workspace }) => {
   const [status, setStatus] = useState('');
   return (
     <div className="settings-view">
       <div className="view-header"><h2>Settings</h2></div>
+      <SupabaseSettings connection={connection} workspace={workspace} isSample={isSample} />
       <section className="calculator-card pop-settings" aria-labelledby="pop-settings-title">
         <h3 id="pop-settings-title" className="card-title">Periods of performance</h3>
         <p className="settings-description">These 24 POP ranges and funded hours are fixed for now and shared by both data sources. Start and end dates are inclusive.</p>
@@ -41,15 +47,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isSample, leaveSetti
           </table>
         </div>
       </section>
-      <LeavePolicyForm key={isSample ? 'sample' : 'personal'} settings={leaveSettings} onSave={onSaveLeaveSettings} />
+      {workspace.ready && <LeavePolicyForm key={isSample ? 'sample' : connection.session?.user.id} settings={leaveSettings} onSave={onSaveLeaveSettings} />}
       <section className="calculator-card sample-settings" aria-labelledby="sample-settings-title">
         <h3 id="sample-settings-title" className="card-title">Data source</h3>
         <fieldset className="dataset-selector">
           <legend className="sr-only">Choose personal or sample data</legend>
-          <label className="dataset-option"><input type="radio" name="dataset" value="personal" checked={!isSample} onChange={() => { setStatus(''); onUsePersonal(); }} /><span>My data</span></label>
+          <label className="dataset-option"><input type="radio" name="dataset" value="personal" checked={!isSample} onChange={() => { setStatus(''); onUsePersonal(); }} /><span>My data · Supabase</span></label>
           <label className="dataset-option"><input type="radio" name="dataset" value="sample2026" checked={isSample} onChange={() => { setStatus(''); onUseSample(); }} /><span>2026 sample data</span></label>
         </fieldset>
-        <p className="settings-description">{isSample ? 'You are using sample data. Your personal logs are kept separate.' : 'You are using your personal logs. Switch to sample data to try the calendar with test entries.'}</p>
+        <p className="settings-description">{isSample ? 'You are using sample data in this browser. Your Supabase data is kept separate.' : 'Your personal timesheet uses Supabase. Switch to sample data to try the views with local test entries.'}</p>
         <div className="sample-actions">
           <button type="button" className="btn-secondary" disabled={!isSample} onClick={() => setStatus(`Sample data reset to the original ${onResetSample()} entries.`)}>Reset sample data</button>
           <a className="btn-secondary" href="?sample=2026">Open sample calendar</a>
