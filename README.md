@@ -8,7 +8,7 @@
 
 A dedicated, streamlined single-user time tracking web application designed to replace spreadsheet-based work logs with instant calculations, shift projections, and leave accrual management.
 
-Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScript), containerized with **Docker Desktop**, and using **Supabase** as the default personal-data store (integration branch; live setup verification is pending).
+Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScript), containerized with **Docker Desktop**, and using **Supabase** as the default personal-data store.
 
 ---
 

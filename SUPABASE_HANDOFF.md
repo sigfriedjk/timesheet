@@ -8,9 +8,18 @@
 - Production/base commit: `17d7bb8303df2d04528b512f6d6d14bf3c2bbd56`.
 - Initial draft checkpoint: `3c79366f5b9f0b1a2baef1f472f01a2070274208`.
 
-**The Supabase migration is now applied and live backend verification passes. Auth URL configuration and production deployment remain blocked.** Deployment is already authorized once the integration is verified and ready; do not deploy an unverified backend integration.
+**The Supabase migration and production Auth URL configuration are verified, and live backend/browser verification passes. The integration is ready for release through PR #1.** Deployment is authorized; verify the Pages Actions run and actual production assets/browser smoke report after merging.
 
-## Current resume — October 21, 2026
+## Release readiness — October 21, 2026 (America/New_York)
+
+- The user saved the production Auth URLs in the dashboard. Management API readback confirms Site URL `https://sigfriedjk.github.io/timesheet/`, redirect allowlist `https://sigfriedjk.github.io/timesheet/**`, email enabled, and signups enabled. The previous Auth permission blocker is resolved through the dashboard.
+- `SUPABASE_MASTER` remains absent from this runtime, but is no longer needed for release. Setup supports it for future administrative work, with `SUPABASE_ACCESS_TOKEN` as fallback. Keep both server-side.
+- Real-backend RLS/CRUD/report/import tests and Chromium callback/recovery/refresh/save/reload/edit/delete/settings/import/sign-out/account-isolation checks passed. Temporary accounts were cleaned up, independently confirmed by SQL. The local production smoke check, build, 74 unit/PostgreSQL tests, and 8 mocked browser tests passed; built assets contain no configured privileged credentials.
+- Publish through https://github.com/sigfriedjk/timesheet/pull/1. A merge to `main` triggers `.github/workflows/deploy.yml`, including the remote production browser smoke check. Use its run status and the production URL to establish deployment success; the pre-integration base commit listed above is historical.
+- Email delivery still requires the user to request/open their own sign-in link. Verification sends no emails. This does not block release after URL configuration and live Auth sessions are verified.
+- The remaining sections record earlier checkpoints; their missing-token/configuration/deployment blockers are historical and superseded by this section.
+
+## Earlier checkpoint — October 21, 2026
 
 - The user added a full-permission Management token named `SUPABASE_MASTER`. Fresh process checks and current runtime-status observations still show it absent/unlisted; the environment configuration must reach this runtime before it can be used. Setup now prefers `SUPABASE_MASTER`, then falls back to `SUPABASE_ACCESS_TOKEN`. Never print either value. Vite rejects Management-token literals and `VITE_SUPABASE_MASTER`/`VITE_SUPABASE_ACCESS_TOKEN` before bundling.
 - Checked out `wip/supabase-integration-20261021` from GitHub. Production `main` is still `17d7bb8`.
