@@ -1025,13 +1025,16 @@ button:disabled { cursor: wait; }
 .supabase-access h2 { margin-bottom: 1rem; }
 .supabase-access > .btn-secondary { margin-top: 1rem; }
 .supabase-sign-in { margin-top: 1rem; }
-.supabase-settings { margin-bottom: 1.5rem; }
+.supabase-settings, .data-transfer-settings { margin-bottom: 1.5rem; }
 .supabase-sign-in input { flex: 1 1 220px; min-width: 0; }
 .supabase-sign-in .sample-actions { align-items: stretch; }
 .form-error { color: var(--danger, #b42318); margin: .75rem 0; overflow-wrap: anywhere; }
 .supabase-setup { margin-top: 1rem; }
 .supabase-setup summary { cursor: pointer; font-weight: 600; padding: .5rem 0; }
 .supabase-setup form, .browser-import { margin-top: 1rem; }
+.data-transfer-settings .form-label { display: block; margin-top: 1rem; }
+.data-transfer-settings input[type="file"] { box-sizing: border-box; max-width: 100%; }
+.json-import-preview { overflow-wrap: anywhere; }
 .setup-steps { padding-left: 1.5rem; line-height: 1.6; }
 .setup-steps code { overflow-wrap: anywhere; }
 .setup-sql { max-height: 260px; overflow: auto; padding: 1rem; font-size: .75rem; background: var(--bg-primary); border-radius: 8px; }

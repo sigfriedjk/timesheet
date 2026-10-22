@@ -3,7 +3,8 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { MonthlyReportState, TimeLog } from '../types';
 import { createDefaultMonthlyReport } from '../utils/monthlySummary';
 import { createSupabaseRepository, normalizeMonthlyReport } from '../services/supabaseRepository';
-import { deleteTimeLog, getAllTimeLogs, getMonthlyReportState, initializeSampleLogs, LogDataset, saveMonthlyReportState, saveTimeLog } from '../services/storage';
+import { deleteTimeLog, getAllTimeLogs, getMonthlyReportState, importSampleLogs, initializeSampleLogs, LogDataset, saveMonthlyReportState, saveTimeLog } from '../services/storage';
+import { parseTimesheetJson } from '../services/jsonBackup';
 
 type Data = { logs: TimeLog[]; report: MonthlyReportState };
 const empty = (): Data => ({ logs: [], report: createDefaultMonthlyReport() });
@@ -88,6 +89,15 @@ export function useWorkspace(dataset: LogDataset, client: SupabaseClient | null,
       const count = await repository.importBrowserData(getAllTimeLogs(), getLegacyReport());
       assertCurrent();
       const data = await repository.load();
+      apply(data);
+      return count;
+    }),
+    importJson: (contents: string) => operation(async () => {
+      const backup = parseTimesheetJson(contents);
+      if (backup.dataset && backup.dataset !== dataset) throw new Error(`This backup belongs to ${backup.dataset === 'sample2026' ? '2026 sample data' : 'My data'}. Switch data source before importing it.`);
+      const count = repository ? await repository.importBrowserData(backup.logs, backup.report) : importSampleLogs(backup.logs);
+      assertCurrent();
+      const data = repository ? await repository.load() : { logs: getAllTimeLogs('sample2026'), report: getMonthlyReportState('sample2026') };
       apply(data);
       return count;
     }),

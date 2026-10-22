@@ -6,6 +6,7 @@ import { useWorkspace, getLegacyReport } from './useWorkspace';
 import { createDefaultMonthlyReport } from '../utils/monthlySummary';
 import { clearStorageForTesting, getAllTimeLogs, saveTimeLog } from '../services/storage';
 import { LogDataset } from '../services/storage';
+import { exportTimesheetJson } from '../services/jsonBackup';
 
 const mocks = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('../services/supabaseRepository', async original => ({ ...await original<any>(), createSupabaseRepository: mocks.create }));
@@ -18,6 +19,36 @@ function hook(userId: string | undefined = 'a') { return renderHook(({ userId, d
 beforeEach(() => { clearStorageForTesting(); mocks.create.mockReset(); });
 afterEach(cleanup);
 describe('Workspace persistence and isolation', () => {
+  it('imports validated JSON atomically through the signed-in repository and rejects invalid files before writing', async () => {
+    const repo = repository(); mocks.create.mockReturnValue(repo);
+    const { result } = hook();
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    const contents = exportTimesheetJson([log('2026-10-02')], data().report, 'personal');
+    await act(async () => { expect(await result.current.importJson(contents)).toBe(1); });
+    expect(repo.importBrowserData).toHaveBeenCalledWith([log('2026-10-02')], data().report);
+    repo.importBrowserData.mockClear();
+    await act(async () => { await expect(result.current.importJson('[{"date":"2026-02-30","totalHours":8}]')).rejects.toThrow('date'); });
+    await act(async () => { await expect(result.current.importJson(exportTimesheetJson([], null, 'sample2026'))).rejects.toThrow('Switch data source'); });
+    expect(repo.importBrowserData).not.toHaveBeenCalled();
+    repo.importBrowserData.mockRejectedValueOnce(new Error('Offline'));
+    await act(async () => { await expect(result.current.importJson(contents)).rejects.toThrow('Offline'); });
+    expect(result.current.logs).toEqual(data().logs);
+    expect(getAllTimeLogs()).toEqual([]);
+  });
+  it('merges sample JSON locally, preserves conflicts and personal originals, and never creates a repository', async () => {
+    saveTimeLog('2026-10-21', 12, 'personal original');
+    const { result } = renderHook(() => useWorkspace('sample2026', client, 'a'));
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    const existing = result.current.logs.find(log => log.date === '2026-01-02')!;
+    const report = result.current.report;
+    const contents = JSON.stringify([{ date: '2026-01-02', totalHours: 1 }, { date: '2026-10-22', totalHours: 4.1 }]);
+    await act(async () => { expect(await result.current.importJson(contents)).toBe(1); });
+    expect(result.current.logs).toHaveLength(150);
+    expect(result.current.logs.find(log => log.date === existing.date)).toEqual(existing);
+    expect(result.current.report).toEqual(report);
+    expect(getAllTimeLogs()[0].notes).toBe('personal original');
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
   it('gates personal views until auth and both cloud resources load', async () => {
     const repo = repository(); const load = deferred<ReturnType<typeof data>>(); repo.load.mockReturnValue(load.promise); mocks.create.mockReturnValue(repo);
     const { result, rerender } = renderHook(({ userId }) => useWorkspace('personal', client, userId), { initialProps: { userId: undefined as string | undefined } });

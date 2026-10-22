@@ -2,6 +2,7 @@
 // No emails, browser traces, screenshots, or exported session files are produced.
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 
 export async function verifyLiveBrowser({ site, sessions, fetch }) {
@@ -87,13 +88,30 @@ export async function verifyLiveBrowser({ site, sessions, fetch }) {
     await wait(() => !document.querySelector('.browser-import button')?.disabled);
     await page.getByRole('button', { name: 'Import existing browser data' }).click();
     stage = 'waiting for explicit browser import acknowledgement';
-    await wait(() => document.querySelector('.supabase-settings [role=status]')?.textContent.includes('Imported 1'));
+    await wait(() => document.querySelector('.data-transfer-settings [role=status]')?.textContent.includes('Imported 1'));
     stage = 'checking import preservation';
     assert.equal(await page.evaluate(() => localStorage.getItem('work_hours_tracker_time_logs')), legacy);
     assert.equal(await page.locator('input[name=openingPto]').inputValue(), '75.25');
+    stage = 'importing a JSON file into the real account';
+    const json = JSON.stringify({ logs: [{ date: '2026-10-01', totalHours: 1 }, { date: '2026-10-23', totalHours: 5.2 }],
+      report: { ptoPolicyVersion: 1, settings: { openingPto: 999 }, entries: [], projectedWork: {} } });
+    await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'live-backup.json', mimeType: 'application/json', buffer: Buffer.from(json) });
+    await wait(() => !!document.querySelector('.json-import-preview'));
+    await page.getByRole('button', { name: 'Import JSON', exact: true }).click();
+    await wait(() => document.querySelector('.data-transfer-settings [role=status]')?.textContent.includes('Imported 1 missing entries'));
+    stage = 'exporting a real cloud JSON backup';
+    const downloading = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+    const download = await downloading;
+    const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
+    assert.equal(exported.logs.length, 4);
+    assert.equal(exported.logs.find(log => log.date === '2026-10-01').totalHours, 9);
+    assert.equal(exported.logs.find(log => log.date === '2026-10-23').totalHours, 5.2);
+    assert.equal(exported.report.settings.openingPto, 75.25);
+    assert.ok(!/access_token|refresh_token|user_id/.test(JSON.stringify(exported)));
     await nav('Calendar');
     stage = 'checking imported calendar records';
-    await wait(() => document.querySelectorAll('.calendar-logged').length === 3);
+    await wait(() => document.querySelectorAll('.calendar-logged').length === 4);
     await page.getByRole('button', { name: 'Edit 2026-10-01', exact: true }).click();
     assert.equal(Number(await page.locator('#day-hours').inputValue()), 9);
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -105,12 +123,12 @@ export async function verifyLiveBrowser({ site, sessions, fetch }) {
       localStorage.setItem(key, JSON.stringify(session));
     }, storageKey);
     await page.reload();
-    await wait(() => document.querySelectorAll('.calendar-logged').length === 3);
+    await wait(() => document.querySelectorAll('.calendar-logged').length === 4);
     assert.ok(refreshes > refreshesBefore, 'Session recovery should refresh the expired session');
     stage = 'deleting a persisted entry';
     page.on('dialog', dialog => dialog.accept());
     await page.getByRole('button', { name: 'Delete 2026-10-21', exact: true }).click();
-    await wait(() => document.querySelectorAll('.calendar-logged').length === 2);
+    await wait(() => document.querySelectorAll('.calendar-logged').length === 3);
     stage = 'signing out and switching accounts';
     await nav('Settings');
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
@@ -129,7 +147,7 @@ export async function verifyLiveBrowser({ site, sessions, fetch }) {
     await nav('Settings');
     assert.equal(await page.locator('input[name=openingPto]').inputValue(), '0');
     assert.equal(bridgeFailed, false, 'All live requests must complete through the configured proxy');
-    console.log('Live Chromium verified Auth callback/recovery/refresh, calculator save, cloud reload/edit/delete, leave settings, explicit non-destructive import, sign-out, and account isolation. Backend requests used TLS-verified server forwarding; no responses were mocked.');
+    console.log('Live Chromium verified Auth callback/recovery/refresh, calculator save, cloud reload/edit/delete, leave settings, browser and JSON import/export preserving conflicts, sign-out, and account isolation. Backend requests used TLS-verified server forwarding; no responses were mocked.');
   } catch (error) {
     // Playwright errors can contain URLs bearing tokens. Report only the stage.
     throw new Error(`Live browser verification failed while ${stage} (${error.name}); browser details omitted to protect session tokens.`);

@@ -8,6 +8,7 @@ import { POP_PERIODS } from '../config/periodsOfPerformance';
 import { SupabaseSettings } from './SupabaseSettings';
 import { SupabaseConnection } from '../hooks/useSupabaseConnection';
 import { Workspace } from '../hooks/useWorkspace';
+import { DataTransferSettings } from './DataTransferSettings';
 
 interface SettingsViewProps {
   isSample: boolean;
@@ -37,6 +38,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isSample, leaveSetti
     <div className="settings-view">
       <div className="view-header"><h2>Settings</h2></div>
       <SupabaseSettings connection={connection} workspace={workspace} isSample={isSample} />
+      <DataTransferSettings workspace={workspace} isSample={isSample} />
       <section className="calculator-card pop-settings" aria-labelledby="pop-settings-title">
         <h3 id="pop-settings-title" className="card-title">Periods of performance</h3>
         <p className="settings-description">These 24 POP ranges and funded hours are fixed for now and shared by both data sources. Start and end dates are inclusive.</p>

@@ -1,4 +1,5 @@
 import { expect, test, Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 const HOST = 'https://yiqquogdutgujsacoezh.supabase.co';
 const A = '11111111-1111-4111-8111-111111111111';
@@ -14,7 +15,11 @@ async function backend(page: Page, signedIn = true) {
     let data: unknown; let status = 200;
     if (path.includes('/auth/')) data = {};
     else if ((method === 'GET' && state.failRead) || (method !== 'GET' && state.failWrite)) { data = { message: 'Simulated connection failure', code: 'TEST' }; status = 500; }
-    else if (path.endsWith('/rpc/import_browser_timesheet')) { data = 1; }
+    else if (path.endsWith('/rpc/import_browser_timesheet')) {
+      const missing = body.p_logs.filter((log: { date: string }) => !state.logs.some(existing => existing.date === log.date));
+      state.logs.push(...missing.map((log: any) => entry(log.date, log.total_hours, log.notes)));
+      data = missing.length;
+    }
     else if (path.endsWith('/timesheet_reports')) {
       if (method === 'POST') state.report = body.state;
       data = { state: state.report };
@@ -32,6 +37,62 @@ async function backend(page: Page, signedIn = true) {
   return state;
 }
 const nav = (page: Page, name: string) => page.locator('.nav-tab-btn').filter({ hasText: name }).click();
+
+test('Settings exposes JSON controls while signed out and explains when old browser data is absent', async ({ page }) => {
+  await backend(page, false);
+  await page.goto('/?view=settings');
+  await expect(page.getByRole('heading', { name: 'Import & export JSON' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Import JSON', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Import existing browser data' })).toBeVisible();
+  await expect(page.getByText('No previous personal records were found in this browser.', { exact: false })).toBeVisible();
+});
+
+test('exports the current cloud snapshot and previews, validates and retries JSON imports without overwriting conflicts', async ({ page }) => {
+  const state = await backend(page);
+  await page.goto('/?view=settings');
+  const card = page.locator('.data-transfer-settings');
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+  const download = await downloading;
+  const backup = JSON.parse(await readFile((await download.path())!, 'utf8'));
+  expect(backup.logs).toHaveLength(1);
+  expect(backup.logs[0].totalHours).toBe(8);
+  expect(backup.report).toEqual(report);
+  expect(JSON.stringify(backup)).not.toMatch(/access_token|refresh_token|user_id/);
+  await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'broken.json', mimeType: 'application/json', buffer: Buffer.from('[{"date":"2026-02-30","totalHours":8}]') });
+  await expect(card.getByRole('alert')).toContainText('Invalid date');
+  expect(state.requests.filter(request => request.path.includes('/rpc/'))).toHaveLength(0);
+  await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify([{ date: '2026-10-01', totalHours: 1 }, { date: '2026-10-22', totalHours: 4.1 }])) });
+  await expect(card.locator('.json-import-preview')).toContainText('1 new dates and 1 already saved');
+  state.failWrite = true;
+  await page.getByRole('button', { name: 'Import JSON', exact: true }).click();
+  await expect(card.getByRole('alert')).toContainText('Simulated connection failure');
+  await expect(card.locator('.json-import-preview')).toBeVisible();
+  state.failWrite = false;
+  await page.getByRole('button', { name: 'Import JSON', exact: true }).click();
+  await expect(card.getByRole('status')).toContainText('Imported 1 missing entries');
+  expect(state.logs.find(log => log.date === '2026-10-01')!.total_hours).toBe(8);
+  await nav(page, 'Calendar');
+  await expect(page.locator('.calendar-logged')).toHaveCount(2);
+});
+
+test('sample JSON import and export work offline with zero Supabase requests', async ({ page }) => {
+  const state = await backend(page);
+  await page.goto('/?sample=2026&view=settings');
+  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeEnabled();
+  await page.context().setOffline(true);
+  await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'sample.json', mimeType: 'application/json', buffer: Buffer.from('[{"date":"2026-10-22","totalHours":4.1}]') });
+  await page.getByRole('button', { name: 'Import JSON', exact: true }).click();
+  await expect(page.locator('.data-transfer-settings').getByRole('status')).toContainText('Imported 1 missing entries');
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+  const download = await downloading;
+  const backup = JSON.parse(await readFile((await download.path())!, 'utf8'));
+  expect(backup.dataset).toBe('sample2026');
+  expect(backup.logs).toHaveLength(150);
+  expect(state.requests).toHaveLength(0);
+});
 
 test('fresh personal visits require sign-in and never use legacy browser records automatically', async ({ page }) => {
   const state = await backend(page, false);

@@ -65,6 +65,8 @@ Public defaults are in `src/config/supabasePublic.ts`; override them with `VITE_
 
 Existing personal browser data is preserved. After signing in, use **Settings → Import existing browser data** explicitly. One transactional RPC imports missing dates/report state, preserves existing cloud rows/settings, and leaves browser originals intact. Cloud write failures remain visible in the editor; they never fall back to local personal storage. Account, project, and source changes clear previous data and drafts.
 
+**Settings → Import & export JSON** is always visible near the top of Settings. **Export JSON** downloads the selected workspace's entries, leave settings, and forecasts without account credentials. Choose a **JSON file**, review the entry counts, then click **Import JSON**. Versioned app backups and older arrays of time entries are accepted; the whole file is validated before saving. Imports add missing dates and preserve existing entries/settings. Personal imports use one atomic cloud transaction; file settings are restored only when the account has no saved report. Sample imports add local entries and preserve sample settings, with no Supabase requests. Exported backups identify their workspace to prevent accidental sample/personal mixing. The previous-browser import control stays visible with an explanation when no browser records are found; available browser records can also be exported before signing in.
+
 Verification:
 
 - `npm test`: calculation/storage, real SDK request contracts, auth/workspace lifecycle, and embedded PostgreSQL migration/RLS/import tests.
