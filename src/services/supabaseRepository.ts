@@ -2,19 +2,12 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { MonthlyReportState, PeriodOfPerformance, TimeLog } from '../types';
 import { POP_PERIODS } from '../config/periodsOfPerformance';
 import { roundToTenth } from '../utils/calculations';
-import { createDefaultMonthlyReport, normalizeLeaveSettings } from '../utils/monthlySummary';
+import { normalizeMonthlyReport } from './monthlyReport';
+export { normalizeMonthlyReport } from './monthlyReport';
 
 interface LogRow { id: string; date: string; total_hours: number; notes: string | null; created_at: string; updated_at: string }
 const mapLog = (row: LogRow): TimeLog => ({ id: row.id, date: row.date, totalHours: Number(row.total_hours), notes: row.notes ?? undefined, createdAt: row.created_at, updatedAt: row.updated_at });
 const check = (error: { message: string } | null) => { if (error) throw new Error(error.message); };
-
-export function normalizeMonthlyReport(parsed: Partial<MonthlyReportState> | null): MonthlyReportState {
-  const fallback = createDefaultMonthlyReport();
-  if (!parsed || !Array.isArray(parsed.entries)) return fallback;
-  const settings = normalizeLeaveSettings(parsed.settings, fallback.settings);
-  const state = { ptoPolicyVersion: 1, settings, entries: parsed.entries, projectedWork: parsed.projectedWork ?? {} };
-  return state;
-}
 
 /** Every request is scoped to the signed-in user; database RLS enforces the same rule. */
 export function createSupabaseRepository(client: SupabaseClient, userId: string) {

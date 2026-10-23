@@ -1,6 +1,6 @@
 import { TimeLog, MonthlyReportState, PeriodOfPerformance, WorkspaceData } from '../types';
 import { POP_PERIODS } from '../config/periodsOfPerformance';
-import { createDefaultMonthlyReport, normalizeLeaveSettings } from '../utils/monthlySummary';
+import { createDefaultMonthlyReport, normalizeMonthlyReport } from './monthlyReport';
 import { roundToTenth } from '../utils/calculations';
 import { createSampleTimeLogs2026 } from './sampleData';
 
@@ -196,10 +196,7 @@ export function getMonthlyReportState(dataset: LogDataset = 'personal'): Monthly
     const stored = dataset === 'sample2026' && getSampleWorkspace() ? JSON.stringify(getSampleWorkspace()!.report) : getItem(`work_hours_tracker_${dataset}_monthly_report`);
     if (!stored) return fallback;
     const parsed = JSON.parse(stored) as MonthlyReportState;
-    if (!parsed || !Array.isArray(parsed.entries)) return fallback;
-    const settings = normalizeLeaveSettings(parsed.settings, fallback.settings);
-    const state = { ptoPolicyVersion: 1, settings, entries: parsed.entries, projectedWork: parsed.projectedWork ?? {} };
-    return state;
+    return normalizeMonthlyReport(parsed, fallback);
   } catch { return fallback; }
 }
 

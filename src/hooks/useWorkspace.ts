@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { MonthlyReportState, PeriodOfPerformance, WorkspaceData } from '../types';
-import { createDefaultMonthlyReport } from '../utils/monthlySummary';
+import { createDefaultMonthlyReport } from '../services/monthlyReport';
 import { createSupabaseRepository } from '../services/supabaseRepository';
 import { defaultPeriods, deleteTimeLog, generateId, getMonthlyReportState, getSamplePeriods, initializeSampleLogs, LogDataset, replaceSampleWorkspace, saveMonthlyReportState, saveSamplePeriods, saveTimeLog } from '../services/storage';
 import { emptyWeekdays } from '../utils/monthAutofill';

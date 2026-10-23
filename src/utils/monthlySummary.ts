@@ -1,4 +1,4 @@
-import { LeaveEntry, LeaveSettings, MonthlyReportState, TimeLog } from '../types';
+import { LeaveEntry, MonthlyReportState, TimeLog } from '../types';
 import { calendarDate, getMonthDays } from './calendar';
 import { roundToHundredth as cents, roundToTenth as tenths } from './calculations';
 
@@ -14,20 +14,8 @@ export interface MonthlyRow {
   balance: LeaveBalance | null; actualBalance: LeaveBalance | null;
 }
 
-export function createDefaultMonthlyReport(year = new Date().getFullYear()): MonthlyReportState {
-  return { ptoPolicyVersion: 1, settings: { openingMonth: `${year}-01`, openingPto: 0, openingHoliday: 0, openingBirthday: 0,
-    workPercent: 94.3 }, entries: [], projectedWork: {} };
-}
-
-export function normalizeLeaveSettings(settings: Partial<LeaveSettings> | undefined, defaults: LeaveSettings): LeaveSettings {
-  return {
-    openingMonth: settings?.openingMonth ?? defaults.openingMonth,
-    openingPto: settings?.openingPto ?? defaults.openingPto,
-    openingHoliday: settings?.openingHoliday ?? defaults.openingHoliday,
-    openingBirthday: settings?.openingBirthday ?? defaults.openingBirthday,
-    workPercent: settings?.workPercent ?? defaults.workPercent,
-  };
-}
+// Preserve the existing public imports while keeping persistence defaults out of report math.
+export { createDefaultMonthlyReport, normalizeLeaveSettings } from '../services/monthlyReport';
 
 function monthIndex(key: string) {
   const [year, month] = key.split('-').map(Number);

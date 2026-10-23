@@ -1,5 +1,5 @@
 import { LeaveCategory, MonthlyReportState, PeriodOfPerformance, TimeLog } from '../types';
-import { createDefaultMonthlyReport } from '../utils/monthlySummary';
+import { createDefaultMonthlyReport } from './monthlyReport';
 import { roundToTenth } from '../utils/calculations';
 import { generateId, LogDataset } from './storage';
 
