@@ -28,6 +28,11 @@ const check = (result, operation) => { if (result.error) throw new Error(`${oper
 const created = [];
 const report = { ptoPolicyVersion: 1, settings: { ptoAccrualRate: 0.125, openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100 }, entries: [], projectedWork: {} };
 try {
+  const settingsResponse = await fetch(`${projectUrl}/auth/v1/settings`, { headers: { apikey: publicKey } });
+  if (!settingsResponse.ok) throw new Error('Cannot verify Auth admission policy; no temporary users created.');
+  const settings = await settingsResponse.json();
+  if (settings.disable_signup !== false)
+    throw new Error('This verifier creates disposable users and must not run against the locked single-owner project. Use npm run verify:admission instead. Run CRUD/restore tests only against a separate staging project.');
   // The admin key is needed only for temporary Auth users. Do not assume it has
   // table privileges, or broaden grants just to accommodate a verification tool.
   const clients = [];
