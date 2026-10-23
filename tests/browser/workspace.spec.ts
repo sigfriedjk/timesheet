@@ -1,14 +1,14 @@
 import { expect, test, Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { POP_PERIODS } from '../../src/config/periodsOfPerformance';
+import { SAMPLE_PERIODS } from '../../src/config/sampleWorkspace';
 import { MonthlyReportState } from '../../src/types';
 
 const HOST = 'https://yiqquogdutgujsacoezh.supabase.co';
 const A = '11111111-1111-4111-8111-111111111111';
-const report: MonthlyReportState = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100 }, entries: [], projectedWork: {} };
+const report: MonthlyReportState = { ptoPolicyVersion: 1, settings: { ptoAccrualRate: 0.125, openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100 }, entries: [], projectedWork: {} };
 const entry = (date = '2026-10-01', hours = 8, notes = 'cloud entry') => ({ user_id: A, id: date, date, total_hours: hours, notes, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' });
 async function backend(page: Page, signedIn = true) {
-  const state = { logs: [entry()], report, periods: POP_PERIODS.map(period => ({ ...period })), failRead: false, failWrite: false, delay: 0, requests: [] as { path: string; method: string; body: any }[] };
+  const state = { logs: [entry()], report, periods: SAMPLE_PERIODS.map(period => ({ ...period })), failRead: false, failWrite: false, delay: 0, requests: [] as { path: string; method: string; body: any }[] };
   await page.route(`${HOST}/**`, async route => {
     const request = route.request(); const path = new URL(request.url()).pathname;
     const body = request.postDataJSON(); const method = request.method();
@@ -18,9 +18,16 @@ async function backend(page: Page, signedIn = true) {
     if (path.includes('/auth/')) data = {};
     else if ((method === 'GET' && state.failRead) || (method !== 'GET' && state.failWrite)) { data = { message: 'Simulated connection failure', code: 'TEST' }; status = 500; }
     else if (path.endsWith('/rpc/replace_timesheet_workspace')) {
-      state.logs = body.p_logs.map((log: any) => entry(log.date, log.total_hours, log.notes));
-      state.report = body.p_report; state.periods = body.p_periods;
-      data = state.logs.length;
+      const rate = body.p_report.settings.ptoAccrualRate ?? state.report.settings.ptoAccrualRate;
+      if (rate == null) {
+        data = { message: 'Set a valid PTO accrual rate before restoring a backup without one' };
+        status = 400;
+      } else {
+        state.logs = body.p_logs.map((log: any) => entry(log.date, log.total_hours, log.notes));
+        state.report = { ...body.p_report, settings: { ...body.p_report.settings, ptoAccrualRate: rate } };
+        state.periods = body.p_periods ?? state.periods;
+        data = state.logs.length;
+      }
     }
     else if (path.endsWith('/timesheet_pop_settings')) {
       if (method === 'POST') state.periods = body.periods;
@@ -79,12 +86,71 @@ test('signed-out project setup downloads the complete SQL migrations in order', 
   const download = await downloading;
 
   expect(download.suggestedFilename()).toBe('timesheet-supabase-setup.sql');
-  const [baseSql, workspaceSql, downloadedSql] = await Promise.all([
+  const [baseSql, workspaceSql, privateConfigurationSql, downloadedSql] = await Promise.all([
     readFile('supabase/migrations/202610210001_timesheet.sql', 'utf8'),
     readFile('supabase/migrations/202610220001_complete_workspace.sql', 'utf8'),
+    readFile('supabase/migrations/202610230001_private_workspace_configuration.sql', 'utf8'),
     readFile((await download.path())!, 'utf8'),
   ]);
-  expect(downloadedSql).toBe(`${baseSql}\n${workspaceSql}`);
+  expect(downloadedSql).toBe(`${baseSql}\n${workspaceSql}\n${privateConfigurationSql}`);
+});
+
+test('new accounts show missing PTO configuration, retain empty POPs, and validate and persist the rate', async ({ page }) => {
+  const state = await backend(page);
+  state.periods = [];
+  state.report = { ...report, settings: { ...report.settings, ptoAccrualRate: null } };
+  await page.goto('/?view=monthly');
+  await expect(page.getByText('Set a PTO accrual rate in Settings to calculate PTO accruals and leave balances. Work totals remain available.')).toBeVisible();
+  await expect(page.locator('[data-stat=month-work-hours]')).toHaveText('8 h');
+  await page.getByRole('button', { name: 'Show accrued', exact: true }).click();
+  await expect(page.locator('[data-month="2026-10"] td').nth(6)).toHaveText('—');
+  await nav(page, 'Settings');
+  await expect(page.getByText('No periods are defined.', { exact: false })).toBeVisible();
+  await openLeave(page);
+  const rate = page.getByLabel('PTO hours earned per hour worked', { exact: true });
+  await expect(rate).toHaveValue('');
+  await rate.fill('0.123456789');
+  await page.getByRole('button', { name: 'Save leave settings', exact: true }).click();
+  expect(await rate.evaluate((input: HTMLInputElement) => input.validity.stepMismatch)).toBe(true);
+  expect(state.report.settings.ptoAccrualRate).toBeNull();
+  await rate.fill('0.12345678');
+  await page.getByRole('button', { name: 'Save leave settings', exact: true }).click();
+  await expect(page.locator('.leave-policy [role=status]')).toContainText('saved');
+  expect(state.report.settings.ptoAccrualRate).toBe(0.12345678);
+  await page.reload();
+  await nav(page, 'Settings');
+  await openLeave(page);
+  await expect(rate).toHaveValue('0.12345678');
+  await nav(page, 'Monthly Summary');
+  await page.getByRole('button', { name: 'Show accrued', exact: true }).click();
+  await expect(page.locator('[data-month="2026-10"] td').nth(6)).toHaveText('0.99');
+  await nav(page, 'POP Summary');
+  await expect(page.locator('.pop-table tbody tr')).toHaveCount(0);
+  await expect(page.getByText('No POP includes today.')).toBeVisible();
+});
+
+test('legacy restore preserves the configured account rate and refuses an unconfigured destination', async ({ page }) => {
+  const state = await backend(page);
+  state.report = { ...report, settings: { ...report.settings, ptoAccrualRate: null } };
+  const { ptoAccrualRate: _rate, ...settings } = report.settings;
+  const legacy = { format: 'timesheet', version: 2, dataset: 'personal', logs: [{ date: '2026-10-22', totalHours: 3 }], report: { ...report, settings }, periods: [] };
+  await page.goto('/?view=settings');
+  await page.locator('.restore-settings > summary').click();
+  await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'legacy.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(legacy)) });
+  await expect(page.getByRole('note')).toContainText('no PTO accrual rate');
+  await page.getByLabel('Replace all data in My data with this file.').check();
+  await page.getByRole('button', { name: 'Restore backup', exact: true }).click();
+  await expect(page.locator('.data-transfer-settings [role=alert]')).toContainText('Set a valid PTO accrual rate');
+  expect(state.logs[0].total_hours).toBe(8);
+  await openLeave(page);
+  await page.getByLabel('PTO hours earned per hour worked', { exact: true }).fill('0.25');
+  await page.getByRole('button', { name: 'Save leave settings', exact: true }).click();
+  await expect(page.locator('.leave-policy [role=status]')).toContainText('saved');
+  await page.getByRole('button', { name: 'Restore backup', exact: true }).click();
+  await expect(page.locator('.data-transfer-settings [role=status]')).toContainText('Replaced');
+  expect(state.report.settings.ptoAccrualRate).toBe(0.25);
+  expect(state.logs[0].total_hours).toBe(3);
+  expect(state.periods).toEqual([]);
 });
 
 test('exports all saved inputs and requires confirmation before replacing every section; failed restores can retry', async ({ page }) => {
@@ -100,8 +166,8 @@ test('exports all saved inputs and requires confirmation before replacing every 
   expect(backup.logs).toHaveLength(2);
   expect(backup.logs[0].totalHours).toBe(8);
   expect(backup.report).toEqual(report);
-  expect(backup.periods).toEqual(POP_PERIODS);
-  expect(backup.version).toBe(2);
+  expect(backup.periods).toEqual(SAMPLE_PERIODS);
+  expect(backup.version).toBe(3);
   expect(JSON.stringify(backup)).not.toMatch(/birthdayMonth|monthlyBalances/);
   expect(JSON.stringify(backup)).not.toMatch(/access_token|refresh_token|user_id/);
   await page.locator('.restore-settings:not([open]) > summary').click();
@@ -110,7 +176,7 @@ test('exports all saved inputs and requires confirmation before replacing every 
   expect(state.requests.filter(request => request.path.includes('/rpc/'))).toHaveLength(0);
   const restoredReport = { ...report, settings: { ...report.settings, openingPto: 123, openingHoliday: 45, openingBirthday: 6, workPercent: 90 },
     entries: ['pto', 'holiday', 'birthday', 'overhead', 'adjustment'].map((category, i) => ({ id: category, date: '2026-10-05', category, hours: i === 4 ? -1.25 : i + 1, notes: `Restore ${category}` })), projectedWork: { '2026-11': 120 } };
-  const restoredPeriods = [{ ...POP_PERIODS[0], name: 'Restored POP', startDate: '2026-01-01', endDate: '2026-12-31', targetHours: 1800 }];
+  const restoredPeriods = [{ ...SAMPLE_PERIODS[0], name: 'Restored POP', startDate: '2026-01-01', endDate: '2026-12-31', targetHours: 1800 }];
   const replacement = { format: 'timesheet', version: 2, dataset: 'personal', logs: [{ date: '2026-10-01', totalHours: 1 }, { date: '2026-10-22', totalHours: 4.1 }], report: restoredReport, periods: restoredPeriods };
   await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'sample.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ ...replacement, dataset: 'sample2026' })) });
   await expect(card.getByRole('alert')).toContainText('Choose a My data backup');
@@ -154,7 +220,7 @@ test('sample Settings hides data transfer and connection controls and saves loca
   await page.reload();
   await expect(page.locator('input[name=openingPto]')).toHaveValue('42.25');
   await page.locator('.pop-management > summary').click();
-  await page.getByRole('button', { name: 'Edit POP Q', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Fictional Comet', exact: true }).click();
   await page.getByLabel('POP name', { exact: true }).fill('Discard on reset');
   await page.getByRole('button', { name: 'Reset sample data' }).click();
   await expect(page.locator('input[name=openingPto]')).toHaveValue('0');
@@ -167,7 +233,7 @@ test('POP names, dates and funding persist, update summaries, and stay isolated 
   const state = await backend(page);
   await page.goto('/?view=settings');
   await page.locator('.pop-management > summary').click();
-  await page.getByRole('button', { name: 'Edit POP Q', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Fictional Comet', exact: true }).click();
   const editor = page.getByRole('form', { name: 'Edit POP' });
   await editor.getByLabel('POP name').fill('Custom Q');
   await editor.getByLabel('End date').fill('2026-11-30');
@@ -183,12 +249,12 @@ test('POP names, dates and funding persist, update summaries, and stay isolated 
   await page.locator('.pop-management > summary').click();
   await expect(page.getByRole('button', { name: 'Edit Custom Q', exact: true })).toBeVisible();
   await nav(page, 'POP');
-  await expect(page.locator('[data-pop=pop-q]')).toContainText('Custom Q');
-  await expect(page.locator('[data-pop=pop-q]')).toContainText('800');
+  await expect(page.locator('[data-pop=fictional-comet]')).toContainText('Custom Q');
+  await expect(page.locator('[data-pop=fictional-comet]')).toContainText('800');
   await nav(page, 'Settings');
   await page.locator('input[value=sample2026]').check();
   await page.locator('.pop-management > summary').click();
-  await expect(page.getByRole('button', { name: 'Edit POP Q', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit Fictional Comet', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Edit Custom Q', exact: true })).toHaveCount(0);
 });
 
@@ -208,7 +274,9 @@ test('sample calculator, calendar, monthly, POP and settings work offline withou
   await nav(page, 'Monthly');
   await expect(page.locator('[data-stat=month-work-hours]')).toHaveText('97.8 h');
   await nav(page, 'POP');
-  await expect(page.locator('.pop-table tfoot td').nth(5)).toHaveText('1210.7');
+  await expect(page.locator('.pop-table tbody tr')).toHaveCount(SAMPLE_PERIODS.length);
+  await expect(page.getByText('Fictional Comet', { exact: true })).toBeVisible();
+  await expect(page.locator('.pop-table tfoot td').nth(5)).toHaveText('826.5');
   await nav(page, 'Calculator');
   await page.locator('#log-date').fill('2026-10-21');
   await page.getByLabel('Time out', { exact: true }).fill('17:00');
@@ -360,7 +428,7 @@ test('Out Target switches its editable field, recalculates with breaks, and copi
 test('Calendar and POP numbers omit trailing decimal zeros in totals, cells, and the day editor', async ({ page }) => {
   const state = await backend(page);
   state.logs = [entry('2026-10-01', 8), entry('2026-10-02', 8.1), entry('2026-10-03', 0)];
-  state.periods = [{ ...POP_PERIODS[0], id: 'formatting', name: 'Formatting', startDate: '2026-01-01', endDate: '2026-12-31', targetHours: 100.1 }];
+  state.periods = [{ ...SAMPLE_PERIODS[0], id: 'formatting', name: 'Formatting', startDate: '2026-01-01', endDate: '2026-12-31', targetHours: 100.1 }];
   await page.goto('/?view=calendar');
   await expect(page.locator('.calendar-day[aria-label^="October 1, 2026:"] .calendar-hours')).toHaveText('8');
   await expect(page.locator('.calendar-day[aria-label^="October 2, 2026:"] .calendar-hours')).toHaveText('8.1');
@@ -380,6 +448,10 @@ test('Calendar and POP numbers omit trailing decimal zeros in totals, cells, and
 
 for (const width of [390, 1280]) test(`summaries default to All Years and show every row with page scrolling at ${width}px`, async ({ page }) => {
   const state = await backend(page);
+  state.periods = Array.from({ length: 36 }, (_, index) => {
+    const month = `${2030 + Math.floor(index / 12)}-${String(index % 12 + 1).padStart(2, '0')}`;
+    return { id: `fictional-scroll-${index}`, name: `Fictional scroll phase ${index}`, startDate: `${month}-03`, endDate: `${month}-20`, targetHours: 3.7 * (index + 1) };
+  });
   state.logs = [entry('2025-01-02', 8), entry('2026-01-02', 9), entry('2027-09-01', 10)];
   state.report = { ...report, settings: { ...report.settings, openingMonth: '2024-11' },
     entries: [{ id: 'january-2026', date: '2026-01-03', category: 'pto', hours: 3 }], projectedWork: { '2028-03': 100 } };
@@ -425,12 +497,12 @@ for (const width of [390, 1280]) test(`summaries default to All Years and show e
   await expect(page.locator('[data-month="2026-01"] .used-pto')).toHaveText('3');
   await nav(page, 'POP');
   await expect(page.getByLabel('POP year', { exact: true })).toHaveCount(0);
-  await expect(page.locator('.pop-table tbody tr')).toHaveCount(24);
+  await expect(page.locator('.pop-table tbody tr')).toHaveCount(state.periods.length);
   expect(await page.locator('.pop-table-scroll').evaluate(el => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
   await page.locator('.pop-table tbody tr').last().scrollIntoViewIfNeeded();
   expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
   expect(await page.locator('.pop-table-scroll').evaluate(el => el.scrollTop)).toBe(0);
-  await expect(page.locator('.pop-table tbody tr')).toHaveCount(24);
+  await expect(page.locator('.pop-table tbody tr')).toHaveCount(state.periods.length);
 });
 
 test('monthly summary trims zeros, collapses accruals, and edits the five saved totals', async ({ page }) => {
@@ -769,7 +841,7 @@ test('source changes clear leave and POP drafts, restore files, and replacement 
   await openLeave(page);
   await page.locator('input[name=openingPto]').fill('999');
   await page.locator('.pop-management > summary').click();
-  await page.getByRole('button', { name: 'Edit POP Q', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit Fictional Comet', exact: true }).click();
   await page.getByLabel('POP name', { exact: true }).fill('Unsaved draft');
   await page.locator('.restore-settings > summary').click();
   await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'restore.json', mimeType: 'application/json', buffer: Buffer.from('[]') });

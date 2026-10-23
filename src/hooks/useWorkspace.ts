@@ -16,6 +16,7 @@ import {
   saveSamplePeriods,
   saveTimeLog,
 } from '../services/storage';
+import { requirePtoAccrualRate } from '../utils/ptoAccrualRate';
 import { emptyWeekdays } from '../utils/monthAutofill';
 import { parseTimesheetJson, validatePeriods } from '../services/jsonBackup';
 
@@ -178,7 +179,7 @@ export function useWorkspace(dataset: LogDataset, client: SupabaseClient | null,
         apply({ periods: saved });
       }),
     importJson: (contents: string) =>
-      operation(async () => {
+      operation(async (data) => {
         const backup = parseTimesheetJson(contents);
         if (backup.dataset && backup.dataset !== dataset)
           throw new Error(
@@ -186,17 +187,24 @@ export function useWorkspace(dataset: LogDataset, client: SupabaseClient | null,
           );
         const report =
           backup.report ?? createDefaultMonthlyReport(dataset === 'sample2026' ? 2026 : undefined);
-        const periods = backup.periods ?? defaultPeriods();
+        const periods = backup.periods;
         let count: number;
         if (repository) {
           count = await repository.replaceWorkspace(backup.logs, report, periods);
         } else {
-          replaceSampleWorkspace({ logs: backup.logs, report, periods });
+          const rate = requirePtoAccrualRate(
+            report.settings.ptoAccrualRate ?? data.report.settings.ptoAccrualRate,
+          );
+          replaceSampleWorkspace({
+            logs: backup.logs,
+            report: { ...report, settings: { ...report.settings, ptoAccrualRate: rate } },
+            periods: periods ?? data.periods,
+          });
           count = backup.logs.length;
         }
         assertCurrent();
-        const data = repository ? await repository.load() : loadSample();
-        apply(data);
+        const restored = repository ? await repository.load() : loadSample();
+        apply(restored);
         return count;
       }),
     resetSample: () => {

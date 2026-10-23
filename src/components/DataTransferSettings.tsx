@@ -50,8 +50,8 @@ export const DataTransferSettings: React.FC<{
       </h3>
       <p className="settings-description">
         Back up all saved inputs: time entries and notes, POP names/dates/funding, monthly
-        PTO/Holiday/Birthday/Overhead/PTO adjustments, opening balances, and leave settings. Monthly
-        balances are recalculated; birthday credit is always in January.
+        PTO/Holiday/Birthday/Overhead/PTO adjustments, opening balances, PTO accrual rate, and leave
+        settings. Monthly balances are recalculated; birthday credit is always in January.
       </p>
       <div className="sample-actions">
         <button
@@ -124,7 +124,7 @@ export const DataTransferSettings: React.FC<{
           <p className="json-import-preview">
             {file.name}: {file.backup.logs.length} time entries;{' '}
             {file.backup.report?.entries.length ?? 0} leave/adjustment entries;{' '}
-            {file.backup.periods?.length ?? 'default'} POPs.
+            {file.backup.periods?.length ?? 'existing'} POPs.
           </p>
         )}
         <p className="settings-description">
@@ -134,8 +134,14 @@ export const DataTransferSettings: React.FC<{
         </p>
         {file && (!file.backup.report || file.backup.periods === undefined) && (
           <p role="note">
-            This older file is incomplete. Missing leave/settings reset to defaults; missing POP
-            definitions reset to the original POP list.
+            This older file is incomplete. Missing leave settings reset to defaults, but your
+            configured PTO accrual rate and any omitted POP definitions are preserved.
+          </p>
+        )}
+        {file && file.backup.report?.settings.ptoAccrualRate == null && (
+          <p role="note">
+            This backup has no PTO accrual rate. Your account’s configured rate will be kept. If no
+            rate is configured, set one in Leave & forecasts before restoring.
           </p>
         )}
         <label className="restore-confirmation">

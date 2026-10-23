@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LeaveSettings } from '../types';
+import { parsePtoAccrualRate } from '../utils/ptoAccrualRate';
 
 export const LeavePolicyForm: React.FC<{
   settings: LeaveSettings;
@@ -34,6 +35,7 @@ export const LeavePolicyForm: React.FC<{
             setSaved(false);
             try {
               await onSave({
+                ptoAccrualRate: parsePtoAccrualRate(String(data.get('ptoAccrualRate') ?? '')),
                 openingMonth: String(data.get('openingMonth')),
                 openingPto: Number(data.get('openingPto')),
                 openingHoliday: Number(data.get('openingHoliday')),
@@ -50,6 +52,27 @@ export const LeavePolicyForm: React.FC<{
           onChange={() => setSaved(false)}
         >
           <fieldset className="async-fields" disabled={busy || disabled}>
+            <h4 className="settings-subheading">PTO accrual rate</h4>
+            <label className="form-label">
+              PTO hours earned per hour worked
+              <input
+                className="form-input"
+                type="number"
+                name="ptoAccrualRate"
+                required
+                min="0"
+                max="1"
+                step="0.00000001"
+                defaultValue={settings.ptoAccrualRate ?? ''}
+                aria-describedby="pto-rate-help"
+              />
+            </label>
+            <p id="pto-rate-help" className="settings-description">
+              Enter hours of PTO per one hour worked, not a percentage. Use 0 through 1, with up to
+              8 decimal places. Monthly accrual rounds to 0.01 hours after multiplying by worked
+              hours. A blank rate is unconfigured; an entered 0 is valid. Changing this rate
+              recalculates all monthly PTO accruals in this workspace.
+            </p>
             <h4 className="settings-subheading">Opening balances</h4>
             <div className="report-settings-grid">
               <label>
@@ -103,7 +126,7 @@ export const LeavePolicyForm: React.FC<{
               balances, accruals, leave used, and adjustments.
             </p>
             <p className="settings-description">
-              PTO accrues at 0.0851 per hour worked; holiday credits are added each month and 8
+              PTO accrues using your configured rate; holiday credits are added each month and 8
               birthday hours in January. Work and leave forecasts use entered records only. Missing
               dates contribute zero.
             </p>

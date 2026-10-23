@@ -1,10 +1,12 @@
 import { LeaveSettings, MonthlyReportState } from '../types';
+import { isPtoAccrualRate } from '../utils/ptoAccrualRate';
 
 /** Defaults and normalization shared by cloud loads and local sample storage. */
 export function createDefaultMonthlyReport(year = new Date().getFullYear()): MonthlyReportState {
   return {
     ptoPolicyVersion: 1,
     settings: {
+      ptoAccrualRate: null,
       openingMonth: `${year}-01`,
       openingPto: 0,
       openingHoliday: 0,
@@ -21,6 +23,12 @@ export function normalizeLeaveSettings(
   defaults: LeaveSettings,
 ): LeaveSettings {
   return {
+    ptoAccrualRate:
+      settings?.ptoAccrualRate === undefined
+        ? (defaults.ptoAccrualRate ?? null)
+        : isPtoAccrualRate(settings.ptoAccrualRate)
+          ? settings.ptoAccrualRate
+          : null,
     openingMonth: settings?.openingMonth ?? defaults.openingMonth,
     openingPto: settings?.openingPto ?? defaults.openingPto,
     openingHoliday: settings?.openingHoliday ?? defaults.openingHoliday,

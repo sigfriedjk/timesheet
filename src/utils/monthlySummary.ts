@@ -1,9 +1,9 @@
+import { isPtoAccrualRate } from './ptoAccrualRate';
 import { MonthlyReportState, TimeLog } from '../types';
 import { groupByMonth, monthlyWork, monthlyLeave } from './monthlyInputs';
 import { calendarDate, getMonthDays } from './calendar';
 import { roundToHundredth as cents, roundToTenth as tenths } from './calculations';
 
-export const PTO_RATE = 0.0851;
 export const DAY_HOURS = 8;
 export interface LeaveBalance {
   pto: number;
@@ -26,7 +26,7 @@ export interface MonthlyRow {
   rollingTotal: number;
   rollingAverage: number;
   rollingMonths: number;
-  accruedPto: number;
+  accruedPto: number | null;
   accruedHoliday: number;
   accruedBirthday: number;
   usedPto: number;
@@ -80,6 +80,7 @@ export function buildMonthlySummary(
   asOf: string,
 ) {
   const { settings, entries } = state;
+  const rate = isPtoAccrualRate(settings.ptoAccrualRate) ? settings.ptoAccrualRate : null;
   const cutoffMonth = monthIndex(asOf.slice(0, 7));
   const opening = monthIndex(settings.openingMonth);
   const range = getMonthlySummaryRange(logs, state, asOf);
@@ -113,8 +114,8 @@ export function buildMonthlySummary(
     const { actual, used } = monthlyLeave(leaveByMonth.get(key) ?? [], asOf);
     const weekdays = days.filter((day) => !day.isWeekend);
     const holidays = weekdays.filter((day) => day.holiday);
-    const actualPtoAccrued = cents(actualHours * PTO_RATE);
-    const accruedPto = cents(workHours * PTO_RATE);
+    const actualPtoAccrued = rate === null ? null : cents(actualHours * rate);
+    const accruedPto = rate === null ? null : cents(workHours * rate);
     const accruedHoliday = holidays.length * DAY_HOURS;
     const accruedBirthday = month === 0 ? DAY_HOURS : 0;
     const usedPto = used.pto;
@@ -124,7 +125,7 @@ export function buildMonthlySummary(
     const adjustment = used.adjustment;
     let closing: LeaveBalance | null = null,
       actualClosing: LeaveBalance | null = null;
-    if (index >= opening) {
+    if (index >= opening && accruedPto !== null && actualPtoAccrued !== null) {
       projectedBalance = balance(
         projectedBalance.pto + accruedPto - usedPto + adjustment,
         projectedBalance.holiday + accruedHoliday - usedHoliday,
@@ -196,7 +197,7 @@ export function buildMonthlySummary(
       | 'overhead'
       | 'adjustment'
     >,
-  ) => cents(selectedRows.reduce((value, row) => value + row[field], 0));
+  ) => cents(selectedRows.reduce((value, row) => value + (row[field] ?? 0), 0));
   const actualCutoffIndex = Math.min(selectedEnd, cutoffMonth);
   const completedIndex = Math.min(selectedEnd, cutoffMonth - 1);
   const completedWindow = Array.from(
@@ -207,6 +208,7 @@ export function buildMonthlySummary(
     completedWindow.reduce((sum, i) => sum + (rows.get(i)?.actualHours ?? 0), 0),
   );
   return {
+    rateConfigured: rate !== null,
     rows: selectedRows,
     previousMonth: rows.get(cutoffMonth - 1)!,
     currentMonth: rows.get(cutoffMonth)!,
@@ -216,7 +218,7 @@ export function buildMonthlySummary(
       actualHours: sum('actualHours'),
       workHours: sum('workHours'),
       leaveNeeded: sum('leaveNeeded'),
-      accruedPto: sum('accruedPto'),
+      accruedPto: rate === null ? null : sum('accruedPto'),
       accruedHoliday: sum('accruedHoliday'),
       accruedBirthday: sum('accruedBirthday'),
       usedPto: sum('usedPto'),

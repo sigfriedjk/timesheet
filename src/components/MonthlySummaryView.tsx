@@ -62,6 +62,12 @@ export const MonthlySummaryView: React.FC<Props> = ({ logs, state, onChange }) =
   const closing = report.rows[report.rows.length - 1];
   return (
     <div className="monthly-view">
+      {!report.rateConfigured && (
+        <p className="settings-description" role="status">
+          Set a PTO accrual rate in Settings to calculate PTO accruals and leave balances. Work
+          totals remain available.
+        </p>
+      )}
       <MonthlySummaryCards report={report} />
       <div className="monthly-toolbar">
         <button

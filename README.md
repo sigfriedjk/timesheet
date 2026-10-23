@@ -41,7 +41,7 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
 
 4. **POP Summary:**
    * A table modeled on the reference POP report: weekdays, weekday hours, funded hours, funded percentage, worked hours, and Available hours (funded less entered work), with totals.
-   * Settings lets you add, edit, and delete POP names, inclusive date ranges, and funded hours. Each account and the separate sample workspace starts with 24 defaults, POP A–X; changes are isolated to the selected workspace and included in backups.
+   * Settings lets you add, edit, and delete POP names, inclusive date ranges, and funded hours. New personal accounts start with empty POPs. Saved POPs belong to the signed-in account; sample mode uses three clearly fictional phases.
    * Always displays every POP. The two cards show Funded, Worked, and Available for the current POP and its July 1–June 30 POP year. The year card sums the complete POPs in that range. Saved work includes future entries, weekends, and holidays. Jump to today scrolls to the active POP.
 
 5. **Domain Types & Architectural Scaffolding:**
@@ -61,9 +61,9 @@ Public defaults are in `src/config/supabasePublic.ts`; override them with `VITE_
 
 Personal data comes from Supabase; sample data stays in its separate local workspace. Use **Settings → Backup & restore → Restore from JSON…** to restore a personal JSON backup. Legacy personal browser records are left untouched and are not read or imported by the app. Cloud write failures remain visible in the editor; they never fall back to local personal storage. Account, project, and source changes clear previous data and drafts.
 
-**Settings → Backup & restore → Export backup** exports a version 2 backup of every saved input: daily date/hours/notes, POP names/dates/funding, dated PTO/Holiday/Birthday/Overhead/PTO-adjustment entries and notes, opening balances/month, and legacy work-rate/monthly-projection fields retained for backup compatibility. Those legacy fields do not affect forecasts. Monthly balances, accruals, and totals are recalculated, and birthday credit is fixed to January. Calculator helper inputs, credentials, and sessions are excluded.
+**Settings → Backup & restore → Export backup** exports a version 3 backup of every saved input: daily date/hours/notes, POP names/dates/funding, dated PTO/Holiday/Birthday/Overhead/PTO-adjustment entries and notes, opening balances/month, the configured PTO accrual rate, and legacy work-rate/monthly-projection fields retained for backup compatibility. Those legacy fields do not affect forecasts. Monthly balances, accruals, and totals are recalculated, and birthday credit is fixed to January. Calculator helper inputs, credentials, and sessions are excluded.
 
-Restoring JSON **replaces all data in your signed-in account**. Choose a file, review its section counts, check the explicit replacement confirmation, then click **Restore backup**. Personal replacement uses one owner-scoped database transaction; any failure rolls back all sections. Sample replacement remains supported by the storage layer; the Settings UI exposes backup and restore only for personal data. Version 1 backups and older log arrays remain accepted, with a warning that omitted report/settings and POP data reset to defaults. A version 2 file must include all sections, including explicit empty lists. Exported backups identify the workspace to prevent accidental sample/personal mixing. Export a backup first to keep current data.
+Restoring JSON **replaces saved inputs in your signed-in account** after file review and explicit confirmation. The owner-scoped database transaction restores logs, report settings (including PTO rate), leave entries, and POPs atomically; any failure rolls everything back. Version 3 requires complete sections and a valid accrual rate. Versions 1/2 and older log arrays remain accepted: an omitted rate preserves the destination account’s configured rate, or fails without changing data if no rate is configured. Omitted POP definitions preserve the current list; an explicit empty list restores as empty. Missing report inputs reset to defaults apart from the preserved rate. Export a backup first to keep current data.
 
 Verification:
 
@@ -155,6 +155,8 @@ Outputs static production assets to `./dist/`, ready for direct deployment to Gi
         └── download.ts          # Browser file download and temporary URL cleanup
 ```
 
+See [PRIVATE_CONFIGURATION.md](PRIVATE_CONFIGURATION.md) for migration, backup compatibility, and remaining historical exposure.
+
 Unit tests live beside the modules they exercise; browser workflows live in `tests/browser/` and database tests in `supabase/`.
 
 ### Working with the code
@@ -182,21 +184,23 @@ Use `services/monthlyReport.ts` for report defaults and normalization when loadi
 
 * **Leave Accrual Function:**
   $$\text{ROUND}_{0.01}(x) = \frac{\text{ROUND}(x \times 100)}{100}$$
-  $$A_{\text{worked}} = \text{ROUND}_{0.01}(0.0851 \times H_{\text{month}})$$
+  $$A_{\text{worked}} = \text{ROUND}_{0.01}(r_{\mathrm{PTO}} \times H_{\text{month}})$$
 
 ## Monthly Summary Workflow
 
 Open the Monthly Summary tab or use `?view=monthly` (`?sample=2026&view=monthly` for the sample workspace). Monthly and POP summaries automatically use the current local date for actual work and leave, including in sample mode. Open reports refresh at midnight and when returning to the tab. All Years is the default period; use the year selector to narrow the view. Each row includes its month and year. The current month is highlighted in amber and future months use gray shading. The range starts at the earliest opening month, log, leave entry, or work override and extends through the end of the latest saved/current year, including empty months. The two cards stay anchored to today: prior month-end PTO/holiday/birthday balances on the left and the current month’s entered forecast totals on the right. Jump to today selects the current year and scrolls to its current month. The year filter in the Month header changes only the table. Both summary tables display every row and use page scrolling vertically.
 
+PTO accrual rate must be set in **Settings → Leave & forecasts** before PTO accruals and balances can be calculated. It is hours of PTO per one worked hour, from 0 through 1 with up to eight decimal places. Missing configuration is shown explicitly; an entered zero is valid. Changing the rate recalculates all report months. Monthly accruals still round to 0.01 hours after multiplication.
+
 Opening balances default to zero at January of the current year (January 2026 for the sample). Enter the correct starting PTO, holiday, and birthday balances in Settings. Balances carry across years; the report shows unavailable balances before the configured opening month.
 
 Click a month’s pencil to open a compact inline form for its saved PTO, holiday, birthday, overhead, and signed PTO adjustment totals. These fields contain entered data. Blank clears that month/category’s entered values; an explicit zero is saved. Historical PTO and holiday usage come only from entered records, including when loading older backups. Missing history is never filled in. Changes retain existing dated records and notes where possible; increases use today’s date for the current month, month-end for completed months, or the first day for future months. Legacy work-rate and monthly forecast override values remain in backups but do not affect calculations. Use **Show accrued / Hide accrued** to toggle the three accrual columns. Resetting sample data resets only the sample report settings/leave entries/forecasts.
 
-US federal credits are counted on observed weekdays to avoid double credit for actual and observed dates. Historical PTO, holiday, birthday, and overhead usage comes only from entered data. Missing historical entries count as zero usage; older automatic PTO flags are ignored without rewriting stored records. PTO earns 0.0851 hours per worked hour, holiday credits are granted at the start of their month, and birthday credit is 8 hours at the start of January. Future PTO and holiday usage come only from entered records; balances can be negative.
+US federal credits are counted on observed weekdays to avoid double credit for actual and observed dates. Historical PTO, holiday, birthday, and overhead usage comes only from entered data. Missing historical entries count as zero usage; older automatic PTO flags are ignored without rewriting stored records. PTO earns the account’s configured hours per worked hour, holiday credits are granted at the start of their month, and birthday credit is 8 hours at the start of January. Future PTO and holiday usage come only from entered records; balances can be negative.
 
 ## POP Summary
 
-Open `?view=pop` or `?sample=2026&view=pop`. Default POP definitions live in `src/config/periodsOfPerformance.ts` and can be edited in **Settings → Periods of performance**. The 24 defaults span April 25, 2024 through June 30, 2027, including mid-month and cross-year boundaries. Names are generic POP A–X; original aliases and the workbook's worked-hour amounts are not imported. Edited names, dates, and funded amounts belong to the selected workspace.
+Open `?view=pop` or `?sample=2026&view=pop`. Personal POP definitions are loaded only from the authenticated Supabase account, with an empty list for new accounts. Add or edit names, dates, and funding in **Settings → Periods of performance**. Fictional demonstration phases live in `src/config/sampleWorkspace.ts` and never supply personal-account defaults.
 
 All POPs are displayed with their full inclusive date ranges. Weekday hours include holidays, matching the reference: Monday–Friday days × 8. Funded percentage is funded hours divided by weekday hours; table totals use a weighted percentage. Worked hours sum saved daily entries throughout each POP, including future forecasts and weekend/holiday work. Available is funded less worked, and can be negative.
 

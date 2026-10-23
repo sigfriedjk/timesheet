@@ -80,7 +80,7 @@ export async function verifyLiveBrowser({ site, sessions, fetch }) {
     await wait(() => document.querySelector('.leave-policy [role=status]')?.textContent.includes('saved'));
     stage = 'editing persisted POP definitions';
     await page.locator('.pop-management > summary').click();
-    await page.getByRole('button', { name: 'Edit Verification POP', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit Fictional verification phase', exact: true }).click();
     const popEditor = page.getByRole('form', { name: 'Edit POP' });
     await popEditor.getByLabel('POP name').fill('Edited live POP');
     await popEditor.getByLabel('Funded hours').fill('1700.5');
@@ -94,7 +94,7 @@ export async function verifyLiveBrowser({ site, sessions, fetch }) {
     assert.equal(await page.getByRole('button', { name: 'Import existing browser data' }).count(), 0);
     stage = 'importing a JSON file into the real account';
     const json = JSON.stringify({ format: 'timesheet', version: 2, dataset: 'personal', logs: [{ date: '2026-10-01', totalHours: 1, notes: 'Restored' }, { date: '2026-10-23', totalHours: 5.2 }],
-      report: { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 999, openingHoliday: 25, openingBirthday: 3, workPercent: 90, autoPto: false },
+      report: { ptoPolicyVersion: 1, settings: { ptoAccrualRate: 0.125, openingMonth: '2026-01', openingPto: 999, openingHoliday: 25, openingBirthday: 3, workPercent: 90, autoPto: false },
         entries: ['pto', 'holiday', 'birthday', 'overhead', 'adjustment'].map((category, i) => ({ id: category, date: '2026-10-05', category, hours: i === 4 ? -1.25 : i + 1, notes: `Restored ${category}` })), projectedWork: { '2026-11': 120 } },
       periods: [{ id: 'restored', name: 'Restored POP', startDate: '2026-01-01', endDate: '2026-12-31', targetHours: 1900 }] });
     await page.locator('.restore-settings > summary').click();
