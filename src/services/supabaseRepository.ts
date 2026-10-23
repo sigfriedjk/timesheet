@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { MonthlyReportState, PeriodOfPerformance, TimeLog } from '../types';
-import { POP_PERIODS } from '../config/periodsOfPerformance';
 import { roundToTenth } from '../utils/calculations';
+import { requirePtoAccrualRate } from '../utils/ptoAccrualRate';
 import { normalizeMonthlyReport } from './monthlyReport';
 
 interface LogRow {
@@ -58,8 +58,7 @@ export function createSupabaseRepository(client: SupabaseClient, userId: string)
       return {
         logs,
         report: normalizeMonthlyReport(data?.state ?? null),
-        periods: (popData?.periods ??
-          POP_PERIODS.map((period) => ({ ...period }))) as PeriodOfPerformance[],
+        periods: (popData?.periods ?? []) as PeriodOfPerformance[],
       };
     },
     async saveLog(date: string, hours: number, notes?: string) {
@@ -102,6 +101,8 @@ export function createSupabaseRepository(client: SupabaseClient, userId: string)
         throw new Error('The entry could not be deleted. Reload your timesheet and try again.');
     },
     async saveReport(state: MonthlyReportState) {
+      if (state.settings.ptoAccrualRate != null)
+        requirePtoAccrualRate(state.settings.ptoAccrualRate);
       const report = normalizeMonthlyReport({ ...state, ptoPolicyVersion: 1 });
       const { data, error } = await client
         .from('timesheet_reports')
@@ -125,7 +126,7 @@ export function createSupabaseRepository(client: SupabaseClient, userId: string)
     async replaceWorkspace(
       logs: TimeLog[],
       report: MonthlyReportState,
-      periods: PeriodOfPerformance[],
+      periods: PeriodOfPerformance[] | undefined,
     ) {
       const { data, error } = await client.rpc('replace_timesheet_workspace', {
         p_logs: logs.map((log) => ({
@@ -134,7 +135,7 @@ export function createSupabaseRepository(client: SupabaseClient, userId: string)
           notes: log.notes ?? null,
         })),
         p_report: report,
-        p_periods: periods,
+        p_periods: periods ?? null,
       });
       check(error);
       if (typeof data !== 'number')

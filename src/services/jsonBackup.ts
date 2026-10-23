@@ -1,4 +1,5 @@
 import { LeaveCategory, MonthlyReportState, PeriodOfPerformance, TimeLog } from '../types';
+import { isPtoAccrualRate, requirePtoAccrualRate } from '../utils/ptoAccrualRate';
 import { createDefaultMonthlyReport } from './monthlyReport';
 import { roundToTenth } from '../utils/calculations';
 import { generateId, LogDataset } from './storage';
@@ -77,6 +78,8 @@ function report(value: unknown): MonthlyReportState | null {
   return {
     ptoPolicyVersion: 1,
     settings: {
+      ptoAccrualRate:
+        settings.ptoAccrualRate == null ? null : requirePtoAccrualRate(settings.ptoAccrualRate),
       openingMonth: month(setting('openingMonth'), 'opening month'),
       openingPto: number(setting('openingPto'), 'opening PTO'),
       openingHoliday: number(setting('openingHoliday'), 'opening holiday balance'),
@@ -132,7 +135,12 @@ export function parseTimesheetJson(contents: string): TimesheetImport {
   if (!object(backup) || !Array.isArray(backup.logs))
     throw new Error('Expected a timesheet JSON backup or an array of time entries.');
   if (backup.format !== undefined && backup.format !== 'timesheet') return fail('backup format');
-  if (backup.version !== undefined && backup.version !== 1 && backup.version !== 2)
+  if (
+    backup.version !== undefined &&
+    backup.version !== 1 &&
+    backup.version !== 2 &&
+    backup.version !== 3
+  )
     throw new Error('This JSON backup version is not supported.');
   if (
     backup.dataset !== undefined &&
@@ -166,11 +174,18 @@ export function parseTimesheetJson(contents: string): TimesheetImport {
       updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : now,
     };
   });
-  if (backup.version === 2 && (!object(backup.report) || backup.periods === undefined))
+  if (
+    (backup.version === 2 || backup.version === 3) &&
+    (!object(backup.report) || backup.periods === undefined)
+  )
     throw new Error('This complete backup is missing leave settings or POP data.');
+  const parsedReport = report(backup.report);
+  if (backup.version === 3 && !isPtoAccrualRate(parsedReport?.settings.ptoAccrualRate)) {
+    throw new Error('This complete backup is missing a valid PTO accrual rate.');
+  }
   return {
     logs,
-    report: report(backup.report),
+    report: parsedReport,
     periods: backup.periods === undefined ? undefined : validatePeriods(backup.periods),
     dataset: backup.dataset as LogDataset | undefined,
   };
@@ -179,14 +194,15 @@ export function parseTimesheetJson(contents: string): TimesheetImport {
 /** Export timesheet data only, with no Auth session, account IDs, or connection credentials. */
 export function exportTimesheetJson(
   logs: TimeLog[],
-  state: MonthlyReportState | null,
+  state: MonthlyReportState,
   dataset: LogDataset,
-  periods?: PeriodOfPerformance[],
+  periods: PeriodOfPerformance[],
 ): string {
+  requirePtoAccrualRate(state.settings.ptoAccrualRate);
   return JSON.stringify(
     {
       format: 'timesheet',
-      version: periods !== undefined && state !== null ? 2 : 1,
+      version: 3,
       exportedAt: new Date().toISOString(),
       dataset,
       logs: logs.map((log) => ({
@@ -198,7 +214,7 @@ export function exportTimesheetJson(
         updatedAt: log.updatedAt,
       })),
       report: report(state),
-      ...(periods !== undefined ? { periods: validatePeriods(periods) } : {}),
+      periods: validatePeriods(periods),
     },
     null,
     2,

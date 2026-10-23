@@ -27,7 +27,8 @@ describe('Supabase repository through the real SDK', () => {
     expect(result.logs[0]).toMatchObject({ totalHours: 8.5, notes: undefined });
     expect(result.report.settings).not.toHaveProperty('autoPto');
     expect(requests).toHaveLength(4);
-    expect(result.periods).toHaveLength(24);
+    expect(result.periods).toEqual([]);
+    expect(result.report.settings.ptoAccrualRate).toBeNull();
     expect(requests.every(({ url }) => url.searchParams.get('user_id') === 'eq.user-a')).toBe(true);
     expect(requests[1].url.searchParams.get('offset')).toBe('500');
     expect(requests[0].url.searchParams.get('order')).toBe('date.desc');
