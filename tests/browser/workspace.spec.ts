@@ -75,6 +75,34 @@ test('signed-out Settings leads with the source and gates workspace controls', a
   await expect(page.getByLabel('Project URL', { exact: true })).toBeVisible();
 });
 
+test('email sign-in never creates users and handles denial without exposing account details', async ({ page }) => {
+  const state = await backend(page, false);
+  let denied = true;
+  await page.route(`${HOST}/auth/v1/otp**`, async route => {
+    const body = route.request().postDataJSON();
+    state.requests.push({ path: '/auth/v1/otp', method: 'POST', body });
+    await route.fulfill({ status: denied ? 400 : 200, contentType: 'application/json',
+      body: JSON.stringify(denied ? { message: 'No account for private@example.invalid', code: 'signup_disabled' } : {}) });
+  });
+  await page.goto('/?view=settings');
+  await page.getByLabel('Email', { exact: true }).fill('owner@example.invalid');
+  const submit = page.getByRole('button', { name: 'Email sign-in link', exact: true });
+  await submit.click();
+  await expect(page.getByRole('alert')).toHaveText('Could not send a sign-in link. Use your existing account email and try again shortly.');
+  await expect(submit).toBeEnabled();
+  denied = false;
+  await submit.click();
+  await expect(page.getByText('Check your email for a sign-in link. Open it to return to your timesheet.')).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  const requests = state.requests.filter(item => item.path === '/auth/v1/otp');
+  expect(requests).toHaveLength(2);
+  for (const request of requests) {
+    expect(request.body.email).toBe('owner@example.invalid');
+    expect(request.body.create_user).toBe(false);
+  }
+  expect(state.requests.filter(item => item.path.includes('/rest/'))).toHaveLength(0);
+});
+
 test('signed-out project setup downloads the complete SQL migrations in order', async ({ page }) => {
   await backend(page, false);
   await page.goto('/?view=settings');

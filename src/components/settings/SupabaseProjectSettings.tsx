@@ -102,8 +102,14 @@ export const SupabaseProjectSettings: React.FC<{
             <code>https://sigfriedjk.github.io/timesheet/**</code> to Redirect URLs.
           </li>
           <li>
-            Use an email sign-in link in Account & connection. A new timesheet account is created
-            the first time you sign in.
+            This is a single-owner application. In Authentication → Sign In / Providers, disable
+            Allow new users to sign up and keep anonymous sign-ins disabled. Keep Email enabled
+            for your existing account.
+          </li>
+          <li>
+            Use your existing account email in Account & connection. Sign-in does not create an
+            account. For a new project, create only your own account through the Supabase dashboard
+            before disabling signups.
           </li>
         </ol>
         <div className="sample-actions">
