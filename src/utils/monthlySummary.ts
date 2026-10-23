@@ -1,4 +1,5 @@
-import { LeaveEntry, MonthlyReportState, TimeLog } from '../types';
+import { MonthlyReportState, TimeLog } from '../types';
+import { groupByMonth, monthlyWork, monthlyLeave } from './monthlyInputs';
 import { calendarDate, getMonthDays } from './calendar';
 import { roundToHundredth as cents, roundToTenth as tenths } from './calculations';
 
@@ -26,9 +27,6 @@ function balance(pto: number, holiday: number, birthday: number): LeaveBalance {
   const values = { pto: cents(pto), holiday: cents(holiday), birthday: cents(birthday) };
   return { ...values, total: cents(values.pto + values.holiday + values.birthday) };
 }
-function total(entries: LeaveEntry[], category: LeaveEntry['category']) {
-  return cents(entries.filter(entry => entry.category === category).reduce((sum, entry) => sum + entry.hours, 0));
-}
 
 /** Include every saved monthly input, empty intervening months and year-end forecasts. */
 export function getMonthlySummaryRange(logs: TimeLog[], state: MonthlyReportState, asOf: string) {
@@ -52,6 +50,8 @@ export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, 
   const start = Math.min(opening, selectedStart - 11, historyStart, cutoffMonth - 1);
   const end = Math.max(selectedEnd, cutoffMonth);
   const rows = new Map<number, MonthlyRow>();
+  const logsByMonth = groupByMonth(logs);
+  const leaveByMonth = groupByMonth(entries);
   let actualBalance = balance(settings.openingPto, settings.openingHoliday, settings.openingBirthday);
   let projectedBalance = { ...actualBalance };
 
@@ -60,41 +60,27 @@ export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, 
     const days = getMonthDays(year, month);
     const first = calendarDate(year, month, 1), last = calendarDate(year, month + 1, 0);
     const completed = last <= asOf;
-    const monthLogs = logs.filter(log => log.date.startsWith(`${key}-`));
-    const actualHours = tenths(monthLogs.filter(log => log.date <= asOf).reduce((sum, log) => sum + log.totalHours, 0));
-    const monthEntries = entries.filter(entry => entry.date.startsWith(`${key}-`));
-    const actualEntries = monthEntries.filter(entry => entry.date <= asOf);
-    const futureEntries = monthEntries.filter(entry => entry.date > asOf);
+    const { actualHours, workHours, remainingHours } = monthlyWork(logsByMonth.get(key) ?? [], asOf);
+    const { actual, used } = monthlyLeave(leaveByMonth.get(key) ?? [], asOf);
     const weekdays = days.filter(day => !day.isWeekend);
     const holidays = weekdays.filter(day => day.holiday);
-    const actualHolidayUsed = total(actualEntries, 'holiday');
-    const futureHolidayUsed = total(futureEntries, 'holiday');
-    const actualBirthdayUsed = total(actualEntries, 'birthday'), futureBirthdayUsed = total(futureEntries, 'birthday');
-    const actualOverhead = total(actualEntries, 'overhead'), futureOverhead = total(futureEntries, 'overhead');
-    const actualPtoUsed = total(actualEntries, 'pto');
-
-    const futureWork = monthLogs.filter(log => log.date > asOf).reduce((sum, log) => sum + log.totalHours, 0);
-    const workHours = tenths(actualHours + futureWork);
-    const remainingHours = tenths(workHours - actualHours);
-    const futurePtoUsed = total(futureEntries, 'pto');
     const actualPtoAccrued = cents(actualHours * PTO_RATE);
     const accruedPto = cents(workHours * PTO_RATE);
     const accruedHoliday = holidays.length * DAY_HOURS;
     const accruedBirthday = month === 0 ? DAY_HOURS : 0;
-    const actualAdjustment = total(actualEntries, 'adjustment');
-    const adjustment = cents(actualAdjustment + total(futureEntries, 'adjustment'));
-    const usedPto = cents(actualPtoUsed + futurePtoUsed);
-    const usedHoliday = cents(actualHolidayUsed + futureHolidayUsed);
-    const usedBirthday = cents(actualBirthdayUsed + futureBirthdayUsed);
-    const overhead = cents(actualOverhead + futureOverhead);
+    const usedPto = used.pto;
+    const usedHoliday = used.holiday;
+    const usedBirthday = used.birthday;
+    const overhead = used.overhead;
+    const adjustment = used.adjustment;
     let closing: LeaveBalance | null = null, actualClosing: LeaveBalance | null = null;
     if (index >= opening) {
       projectedBalance = balance(projectedBalance.pto + accruedPto - usedPto + adjustment,
         projectedBalance.holiday + accruedHoliday - usedHoliday, projectedBalance.birthday + accruedBirthday - usedBirthday);
       closing = { ...projectedBalance };
       if (first <= asOf) {
-        actualBalance = balance(actualBalance.pto + actualPtoAccrued - actualPtoUsed + actualAdjustment,
-          actualBalance.holiday + accruedHoliday - actualHolidayUsed, actualBalance.birthday + accruedBirthday - actualBirthdayUsed);
+        actualBalance = balance(actualBalance.pto + actualPtoAccrued - actual.pto + actual.adjustment,
+          actualBalance.holiday + accruedHoliday - actual.holiday, actualBalance.birthday + accruedBirthday - actual.birthday);
         actualClosing = { ...actualBalance };
       }
     }
@@ -133,3 +119,5 @@ export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, 
       months: completedWindow.length, start: monthKey(completedIndex - 11), end: monthKey(completedIndex) },
   };
 }
+
+export type MonthlySummary = ReturnType<typeof buildMonthlySummary>;

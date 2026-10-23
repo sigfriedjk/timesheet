@@ -12,9 +12,9 @@ export function buildPopSummary(logs: TimeLog[], periods: readonly PeriodOfPerfo
         if (date.getUTCDay() !== 0 && date.getUTCDay() !== 6) weekdays++;
       }
       const weekdayHours = weekdays * 8;
-      const workedHours = roundToTenth(logs.filter(log => log.date >= period.startDate && log.date <= period.endDate)
-        .reduce((total, log) => total + log.totalHours, 0));
-      const actualHours = roundToTenth(logs.filter(log => log.date >= period.startDate && log.date <= period.endDate && log.date <= asOf).reduce((sum, log) => sum + log.totalHours, 0));
+      const periodLogs = logs.filter(log => log.date >= period.startDate && log.date <= period.endDate);
+      const workedHours = roundToTenth(periodLogs.reduce((total, log) => total + log.totalHours, 0));
+      const actualHours = roundToTenth(periodLogs.filter(log => log.date <= asOf).reduce((sum, log) => sum + log.totalHours, 0));
       return { ...period, weekdays, weekdayHours, workedHours, actualHours, forecastHours: roundToTenth(workedHours - actualHours),
         fundedPercent: weekdayHours ? period.targetHours / weekdayHours * 100 : null,
         remainingHours: roundToTenth(period.targetHours - workedHours),
@@ -36,7 +36,13 @@ export interface PopCard {
 
 /** POP-year totals are the sum of whole POPs from July 1 through June 30. */
 export function buildCurrentPopCards(logs: TimeLog[], periods: readonly PeriodOfPerformance[], asOf: string) {
-  const rows = buildPopSummary(logs, periods, asOf).rows;
+  return currentPopCards(buildPopSummary(logs, periods, asOf).rows, asOf);
+}
+
+export type PopSummaryRow = ReturnType<typeof buildPopSummary>['rows'][number];
+
+/** Reuse the table rows so cards and the table share one calculation. */
+export function currentPopCards(rows: PopSummaryRow[], asOf: string) {
   const active = rows.find(period => period.status === 'Active');
   const startYear = Number(asOf.slice(0, 4)) - (asOf.slice(5, 7) < '07' ? 1 : 0);
   const startDate = `${startYear}-07-01`, endDate = `${startYear + 1}-06-30`;

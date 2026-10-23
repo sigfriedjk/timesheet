@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { PeriodOfPerformance, TimeLog } from '../types';
-import { buildPopSummary, buildCurrentPopCards, PopCard } from '../utils/popSummary';
+import { buildPopSummary, currentPopCards, PopCard } from '../utils/popSummary';
 import { useTodayDate } from '../hooks/useTodayDate';
 import { formatNumber } from '../utils/format';
 
@@ -12,7 +12,7 @@ export const PopSummaryView: React.FC<Props> = ({ logs, periods }) => {
   const currentPop = useRef<HTMLTableRowElement>(null);
   const report = useMemo(() => buildPopSummary(logs, periods, asOf), [logs, periods, asOf]);
   const t = report.totals;
-  const cards = useMemo(() => buildCurrentPopCards(logs, periods, asOf), [logs, periods, asOf]);
+  const cards = useMemo(() => currentPopCards(report.rows, asOf), [report.rows, asOf]);
   return <div className="pop-view">
     <div className="pop-stats pop-summary-cards">
       <PopSummaryCard title="POP Year" period={`${cards.year.startDate} – ${cards.year.endDate}`} card={cards.year} name="year" />
