@@ -8,7 +8,7 @@ export const LeavePolicyForm: React.FC<{ settings: LeaveSettings; onSave: (setti
   const formRef = useRef<HTMLFormElement>(null);
   useEffect(() => { formRef.current?.reset(); }, [settings]);
   return <section className="calculator-card leave-policy" aria-labelledby="leave-policy-heading">
-    <h3 id="leave-policy-heading" className="card-title">Leave & forecasts</h3>
+    <details className="settings-disclosure leave-settings"><summary><h3 id="leave-policy-heading" className="card-title">Leave & forecasts</h3></summary>
     <p className="settings-description">Changes are saved to {scope}.</p>
     <form ref={formRef} onSubmit={async event => {
       event.preventDefault();
@@ -34,5 +34,6 @@ export const LeavePolicyForm: React.FC<{ settings: LeaveSettings; onSave: (setti
       <div className="sample-actions"><button type="submit" className="btn-primary">{busy ? 'Saving…' : 'Save leave settings'}</button><span role="status">{saved ? `Leave and forecast settings saved to ${scope}.` : ''}</span></div>
       {error && <p className="form-error" role="alert">{error}</p>}
     </fieldset></form>
+    </details>
   </section>;
 };
