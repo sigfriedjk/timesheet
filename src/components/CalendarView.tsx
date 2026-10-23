@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { TimeLog } from '../types';
-import { Calendar as CalendarIcon, Trash2, Edit3, Plus, X } from 'lucide-react';
-import { MONTH_NAMES, WEEKDAY_NAMES, getFederalHolidays, getMonthCells, getMonthSummary } from '../utils/calendar';
+import { Calendar as CalendarIcon, Plus } from 'lucide-react';
+import { MONTH_NAMES, getFederalHolidays } from '../utils/calendar';
 import { roundToTenth } from '../utils/calculations';
 import { formatNumber } from '../utils/format';
-import { emptyWeekdays } from '../utils/monthAutofill';
+import { CalendarMonth } from './calendar/CalendarMonth';
+import { DayEditor } from './calendar/DayEditor';
+import { MonthAutofill } from './calendar/MonthAutofill';
+import { SavedEntriesTable } from './calendar/SavedEntriesTable';
 import { useTodayDate } from '../hooks/useTodayDate';
 
 interface CalendarViewProps {
@@ -21,12 +24,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   logs, isSample, onNavigateToCalculator, onDeleteLog, onSaveLog, onFillMonth, busy,
 }) => {
   const today = useTodayDate();
-  const [fillMonth, setFillMonth] = useState(today.slice(0, 7));
-  const [filling, setFilling] = useState(false);
-  const [fillStatus, setFillStatus] = useState('');
-  const [fillError, setFillError] = useState('');
-  let fillCount = 0;
-  try { fillCount = emptyWeekdays(fillMonth, logs).length; } catch { /* Native month validation also blocks submission. */ }
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const remove = async (date: string) => {
@@ -67,28 +64,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         <div className="kpi-card"><div className="kpi-heading"><span className="kpi-label">Logged hours</span><button type="button" className="btn-chip" onClick={jumpToToday}>Jump to today</button></div><span className="kpi-value">{formatNumber(totalYearHours, 1)}</span></div>
       </div>
 
-      <details className="calculator-card calendar-autofill settings-disclosure">
-        <summary>Autofill a month with 8-hour weekdays</summary>
-        <form onSubmit={async event => {
-          event.preventDefault();
-          if (filling || busy || deleting) return;
-          setFilling(true); setFillStatus(''); setFillError('');
-          try {
-            const count = await onFillMonth(fillMonth);
-            setSelectedYear(Number(fillMonth.slice(0, 4))); setSelectedMonth(fillMonth.slice(5, 7));
-            setFillStatus(`Added ${count} eight-hour entries for ${fillMonth}. Existing entries were kept.`);
-          } catch (error) { setFillError(error instanceof Error ? error.message : 'Could not autofill this month.'); }
-          finally { setFilling(false); }
-        }}>
-          <fieldset className="async-fields" disabled={filling || busy || deleting}>
-            <label className="form-label">Month to autofill<input className="form-input" type="month" min="1900-01" max="2100-12" required value={fillMonth} onChange={event => { setFillMonth(event.target.value); setFillStatus(''); setFillError(''); }} /></label>
-            <p className="settings-description">Adds 8 hours to empty Monday–Friday dates, including holidays. Existing hours, zero entries, and notes stay as entered. Future entries become your forecast; past entries count as recorded work.</p>
-            <button type="submit" className="btn-secondary" disabled={!fillCount}>{filling ? 'Saving…' : `Add ${fillCount} weekday entries`}</button>
-          </fieldset>
-          <p className="settings-status" role="status">{fillStatus}</p>
-          {fillError && <p className="form-error" role="alert">{fillError}</p>}
-        </form>
-      </details>
+      <MonthAutofill
+        logs={logs}
+        initialMonth={today.slice(0, 7)}
+        disabled={busy || deleting}
+        onFillMonth={onFillMonth}
+        onFilled={month => {
+          setSelectedYear(Number(month.slice(0, 4)));
+          setSelectedMonth(month.slice(5, 7));
+        }}
+      />
 
       <div className="calendar-legend" aria-label="Calendar legend">
         <span><i className="legend-dot logged-dot" />Logged hours</span>
@@ -96,32 +81,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         <span><i className="legend-dot holiday-dot" />Federal holiday</span>
       </div>
       <div className="year-calendar">
-        {MONTH_NAMES.map((monthName, month) => {
-          const summary = getMonthSummary(yearlyLogs, selectedYear, month);
-          return (
-            <section key={month} ref={selectedYear === Number(today.slice(0, 4)) && month === Number(today.slice(5, 7)) - 1 ? currentMonth : undefined} className="month-calendar calculator-card" aria-label={`${monthName} ${selectedYear}`}>
-              <div className="month-heading"><h3>{monthName}</h3><span>{formatNumber(summary.hours, 1)} h</span></div>
-              <div className="month-weekdays" aria-hidden="true">{WEEKDAY_NAMES.map((day) => <span key={day}>{day}</span>)}</div>
-              <div className="month-days">
-                {getMonthCells(selectedYear, month).map((day, index) => {
-                  if (!day) return <span className="calendar-padding" key={`blank-${index}`} aria-hidden="true" />;
-                  const log = logsByDate.get(day.date);
-                  const label = `${monthName} ${day.day}, ${selectedYear}: ${log ? `${formatNumber(log.totalHours, 1)} hours` : 'no entry'}${day.holiday ? `; ${day.holiday}` : ''}`;
-                  return (
-                    <button key={day.date} type="button" onClick={() => setSelectedDate(day.date)}
-                      className={`calendar-day${day.isWeekend ? ' calendar-weekend' : ''}${day.holiday ? ' calendar-holiday' : ''}${log ? ' calendar-logged' : ''}${day.date === today ? ' calendar-today' : ''}`}
-                      aria-current={day.date === today ? 'date' : undefined}
-                      aria-label={label} title={`${label}${log?.notes ? `; ${log.notes}` : ''}`}>
-                      <span className="calendar-date">{day.day}{day.holiday && <span className="holiday-marker" aria-hidden="true">•</span>}</span>
-                      <span className="calendar-hours">{log ? formatNumber(log.totalHours, 1) : '—'}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-            </section>
-          );
-        })}
+        {MONTH_NAMES.map((_, month) => <CalendarMonth
+          key={month}
+          year={selectedYear}
+          month={month}
+          today={today}
+          logs={yearlyLogs}
+          logsByDate={logsByDate}
+          elementRef={selectedYear === Number(today.slice(0, 4)) && month === Number(today.slice(5, 7)) - 1 ? currentMonth : undefined}
+          onSelectDate={setSelectedDate}
+        />)}
       </div>
 
       <div className="calculator-card table-section">
@@ -129,18 +98,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         {savedLogs.length === 0 ? (
           <div className="empty-state"><CalendarIcon size={40} className="empty-icon" /><p>No entries recorded for {entriesPeriod}.</p></div>
         ) : (
-          <div className="table-responsive"><table className="logs-table">
-            <thead><tr><th>Date</th><th>Day</th><th>Hours</th><th>Holiday</th><th>Notes</th><th>Actions</th></tr></thead>
-            <tbody>{savedLogs.map((log) => {
-              const date = new Date(`${log.date}T12:00:00`);
-              const weekend = date.getDay() === 0 || date.getDay() === 6;
-              return <tr key={log.id} className={`${weekend ? 'weekend-row' : ''} ${holidays[log.date] ? 'holiday-row' : ''}`}>
-                <td>{log.date}</td><td>{date.toLocaleDateString('en-US', { weekday: 'short' })}</td><td><span className="hours-badge">{formatNumber(log.totalHours, 1)}</span></td>
-                <td>{holidays[log.date] ? <span className="badge badge-holiday">{holidays[log.date]}</span> : '—'}</td><td className="log-notes-cell">{log.notes || '—'}</td>
-                <td><div className="row-actions"><button type="button" className="btn-icon" onClick={() => setSelectedDate(log.date)} aria-label={`Edit ${log.date}`}><Edit3 size={16} /></button><button type="button" className="btn-icon btn-danger" disabled={deleting} onClick={() => void remove(log.date)} aria-label={`Delete ${log.date}`}><Trash2 size={16} /></button></div></td>
-              </tr>;
-            })}</tbody>
-          </table></div>
+          <SavedEntriesTable logs={savedLogs} holidays={holidays} deleting={deleting} onEdit={setSelectedDate} onDelete={remove} />
         )}
       </div>
       {selectedDate && <DayEditor key={selectedDate} date={selectedDate} log={logsByDate.get(selectedDate)} holiday={holidays[selectedDate]} onClose={() => setSelectedDate(null)} onSave={(hours, notes) => onSaveLog(selectedDate, hours, notes)} />}
@@ -148,30 +106,3 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   );
 };
 
-const DayEditor: React.FC<{ date: string; log?: TimeLog; holiday?: string; onSave: (hours: number, notes: string) => Promise<void>; onClose: () => void }> = ({ date, log, holiday, onSave, onClose }) => {
-  const ref = useRef<HTMLDialogElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [hours, setHours] = useState(log ? formatNumber(log.totalHours, 1) : '8');
-  const [notes, setNotes] = useState(log?.notes ?? '');
-  useEffect(() => { ref.current?.showModal(); }, []);
-  return <dialog ref={ref} className="day-editor" aria-labelledby="day-editor-title" onClose={onClose} onCancel={event => { if (busy) event.preventDefault(); }}>
-    <form onSubmit={async event => {
-      event.preventDefault();
-      if (busy) return;
-      setBusy(true); setError('');
-      try { await onSave(Number(hours), notes); ref.current?.close(); }
-      catch (error) { setError(error instanceof Error ? error.message : 'Could not save your hours.'); }
-      finally { setBusy(false); }
-    }}><fieldset className="async-fields" disabled={busy}>
-      <div className="table-header-row"><h3 id="day-editor-title">{date}</h3><button type="button" className="btn-icon" onClick={() => ref.current?.close()} aria-label="Close day editor"><X size={18} /></button></div>
-      {holiday && <p className="badge-holiday">{holiday}</p>}
-      <label className="form-label" htmlFor="day-hours">Total hours</label>
-      <input id="day-hours" className="form-input" type="number" value={hours} onChange={(event) => setHours(event.target.value)} min="0" max="24" step="0.1" required autoFocus />
-      <label className="form-label" htmlFor="day-notes">Notes</label>
-      <textarea id="day-notes" className="form-textarea" rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} />
-      <div className="sample-actions"><button type="button" className="btn-secondary" onClick={() => ref.current?.close()}>Cancel</button><button type="submit" className="btn-primary">{busy ? 'Saving…' : 'Save hours'}</button></div>
-      {error && <p className="form-error" role="alert">{error}</p>}
-    </fieldset></form>
-  </dialog>;
-};
