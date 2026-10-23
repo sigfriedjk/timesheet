@@ -1,10 +1,16 @@
+# Private workspace configuration status
+
+The additive private-configuration schema and confirmed account backfill have been applied and checked without changing existing POPs, logs, or other saved settings. The rate was inserted only where missing. Repeating the backfill made no changes. The application changes remain pending PR review; do not merge or deploy until authorized.
+
+See [PRIVATE_CONFIGURATION.md](PRIVATE_CONFIGURATION.md) for current rate units, backup compatibility, validation, and historical exposure. Older release notes below are historical and do not override the current storage and restore rules.
+
 # Supabase integration handoff — October 21, 2026
 
 ## Resume here
 
 ### Complete workspace backup update
 
-The complete-workspace branch adds per-account editable POP definitions (`timesheet_pop_settings`), a version 2 backup covering every saved input, and confirmed JSON replacement through `replace_timesheet_workspace`. Birthday credit is fixed to January; opening balances and the existing work-rate/PTO-inference/monthly-forecast inputs are retained. Monthly balances are calculated. Daily calculator helper inputs remain temporary. Older JSON files are accepted with an explicit omitted-section/default-reset warning. Browser migration remains non-destructive.
+A prior release added per-account editable POP definitions (`timesheet_pop_settings`), a version 2 backup covering every saved input, and confirmed JSON replacement through `replace_timesheet_workspace`. Birthday credit is fixed to January; opening balances and the existing work-rate/PTO-inference/monthly-forecast inputs are retained. Monthly balances are calculated. Daily calculator helper inputs remain temporary. Older JSON files are accepted with an explicit omitted-section/default-reset warning. Browser migration remains non-destructive.
 
 The second migration (`202610220001_complete_workspace.sql`) has been applied live. 83 unit/PostgreSQL tests, 12 browser tests, build/local production smoke, and real Supabase/Chromium checks pass, including POP isolation, complete replacement of all leave categories/settings/POPs, rollback after invalid data, session refresh and cleanup of disposable accounts. Setup now applies all migration files in order. The remaining sections describe older releases and are historical.
 
@@ -94,7 +100,7 @@ Read the cloud-environment-runtime skill and current network policy before netwo
 
 ## Database and server-only tooling
 
-`supabase/migrations/202610210001_timesheet.sql` is now **applied to the real project**. It creates `timesheet_logs`, `timesheet_reports`, owner RLS policies, timestamp triggers, and atomic `import_browser_timesheet`. It is repeatable and transactional. POP definitions remain static shared configuration.
+`supabase/migrations/202610210001_timesheet.sql` is now **applied to the real project**. It creates `timesheet_logs`, `timesheet_reports`, owner RLS policies, timestamp triggers, and atomic `import_browser_timesheet`. It is repeatable and transactional. POP definitions are now account-owned private configuration; see PRIVATE_CONFIGURATION.md.
 
 - `npm run setup:supabase`: server-only `scripts/setup-supabase.mjs`. Requires `SUPABASE_ACCESS_TOKEN`; reads Management API Auth config, runs the migration through the supported database/query endpoint, sets Site URL to `https://sigfriedjk.github.io/timesheet/`, merges `https://sigfriedjk.github.io/timesheet/**` into existing redirects, and reads config back. Does not use `SUPABASE_SECRET_KEY` as a SQL credential. Live migration succeeded; Auth PATCH failed because the token lacks `project_admin_write`.
 - `npm run verify:supabase`: server-only `scripts/verify-supabase.mjs`. Requires the project secret/service-role binding, uses the configured proxy via undici, checks the Data API, creates two temporary confirmed Auth users (`timesheet-verification-*@example.invalid`) **without sending email**, and signs them in with normal public-key clients to test RLS/CRUD/import. Tests anonymous denial, cross-user read/write/delete denial, report preservation, import conflicts/rollback, and ignores spoofed import user IDs. Cleans up temporary users in finally. Failed cleanup explicitly requires dashboard inspection. It never reads existing personal rows for the initial capability check (`limit(0)`).
@@ -122,7 +128,7 @@ Read the cloud-environment-runtime skill and current network policy before netwo
 
 ## Existing behavior to preserve
 
-React 18 + TypeScript + Vite, static GitHub Pages. Daily inputs use 24-hour times, separate actual time-out from helper cards, and six-minute break adjustments. Saving transitions to Calendar only on success. Sample: January 1–October 20, 2026; 149 entries; 1,210.7 hours; February/August empty. Monthly historical gaps default to PTO unless explicit PTO entries (including zero) override inference; versioned policy migration preserves later opt-outs. Fixed POP A–X definitions span April 25, 2024–June 30, 2027; 2026 sample totals: 1,915 funded, 1,210.7 worked, 704.3 remaining hours.
+Historical releases included account-specific configuration as public defaults. Those values are removed from the proposed application, tests, and documentation; old Git objects, browser caches, and previous deployments are not deleted by this change.
 
 ## Prompt to paste in the new conversation
 

@@ -143,7 +143,7 @@ Represents manual overrides or adjustments to the running leave balance for a gi
 
   3. `Total Hours Worked` (Sum of `TimeLog.totalHours` for the month, rounded to 0.1)
 
-  4. `Accrued Worked Leave` ($0.0851 \times \text{Hours Worked}$, rounded to 0.01)
+  4. `Accrued Worked Leave` ($r_{\mathrm{PTO}} \times \text{Hours Worked}$, rounded to 0.01)
 
   5. `Holiday & Birthday Accrual` (Accrued holiday hours + 8.0 hrs on Jan 1st, rounded to 0.01)
 
@@ -157,7 +157,7 @@ Represents manual overrides or adjustments to the running leave balance for a gi
 
 ### Interface 4: POP Pivot Summary View
 
-* **POP Summary Table:** Aggregates logged time by inclusive Period of Performance ranges. New workspaces start with 24 definitions, POP A–X, from April 25, 2024 through June 30, 2027. Settings supports adding, editing, and deleting names, dates, and funded hours, persisted per account or local sample workspace.
+* **POP Summary Table:** Aggregates saved work by inclusive account-owned POP definitions. New accounts start empty; sample mode uses explicitly fictional definitions. Settings supports names, dates, and funding without any personal defaults in the public application.
 
 * **Columns:**
 
@@ -177,7 +177,7 @@ Represents manual overrides or adjustments to the running leave balance for a gi
 
   8. `Funded − Worked` (Signed difference, rounded to 0.1; negative indicates an overrun)
 
-The year filter selects full POPs overlapping that year without truncating cross-year ranges. All-years mode displays all saved periods. Future logs and estimates are excluded from worked hours. Definitions and worked hours are isolated between personal and sample workspaces.
+All POPs are displayed without a year selector. Saved work includes dated future entries. POP definitions and PTO accrual rates belong to the signed-in Supabase workspace; a separate local sample uses fictional configuration.
 
 Complete JSON backups include daily hours/notes, POP definitions, all five monthly leave/adjustment categories with notes, opening balances/month, and existing forecast/PTO-policy inputs. Monthly balances remain calculated from accrued and used amounts. Birthday credit is always in January. JSON import requires explicit confirmation and replaces all selected-workspace inputs atomically; an invalid restore leaves every original section intact. The separate previous-browser migration only adds missing data.
 
@@ -235,7 +235,7 @@ Complete JSON backups include daily hours/notes, POP definitions, all five month
    Fixed rate based on actual hours worked (calculated to nearest hundredth):
 
    $$
-   A_{\text{worked}} = \text{ROUND}_{0.01}(0.0851 \times H_{\text{month}})
+   A_{\text{worked}} = \text{ROUND}_{0.01}(r_{\mathrm{PTO}} \times H_{\text{month}})
    $$
 
 3. **Holiday & Birthday Accruals (**$A_{\text{special}}$**):**
@@ -299,3 +299,5 @@ A selected actuals cutoff separates actual logs/leave from future plans. The def
 Opening balances are configured at the start of a chosen month and carried across years. Historical PTO gaps are automatically filled by default after work and other leave, including empty months; explicit PTO entries, including zero, override the automatic amount. A versioned one-time migration enables this policy for existing report stores without losing balances, entries, or forecasts, while preserving subsequent opt-outs in Settings. Signed PTO adjustments and separate PTO/holiday/birthday/overhead entries are dated so future entries do not alter current balances. All report settings, entries, and forecasts are isolated between personal and sample stores. A sample reset resets only the sample report.
 
 Rolling totals span trailing 12-month windows across years, rather than restarting in January. Partial history is labeled and is not silently padded with zero months before tracking started; empty months inside the tracked range count as zero. Annual totals sum flows, while December balances are closing values and are not summed.
+
+PTO rate configuration is stored per account in `settings.ptoAccrualRate`: PTO hours earned per worked hour, 0 through 1 with at most eight decimal places. Null means unconfigured. There is no personal default rate. Accrual multiplies entered work by the configured rate and then rounds to hundredths. See `PRIVATE_CONFIGURATION.md` for migration and backup rules.
