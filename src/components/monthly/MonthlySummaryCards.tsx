@@ -3,7 +3,10 @@ import { LeaveBalance, MonthlyRow, MonthlySummary } from '../../utils/monthlySum
 import { MONTH_NAMES } from '../../utils/calendar';
 import { formatNumber as fixed } from '../../utils/format';
 
-const BalanceDetail: React.FC<{ value: LeaveBalance | null }> = ({ value }) =>
+const BalanceDetail: React.FC<{ value: LeaveBalance | null; rateConfigured: boolean }> = ({
+  value,
+  rateConfigured,
+}) =>
   value ? (
     <dl className="leave-breakdown">
       {(['pto', 'holiday', 'birthday'] as const).map((category) => (
@@ -20,7 +23,11 @@ const BalanceDetail: React.FC<{ value: LeaveBalance | null }> = ({ value }) =>
       ))}
     </dl>
   ) : (
-    <span>Set an opening month and balances in Settings.</span>
+    <span>
+      {rateConfigured
+        ? 'Set an opening month and balances in Settings.'
+        : 'Set a PTO accrual rate in Settings to calculate balances.'}
+    </span>
   );
 
 export function MonthlySummaryCards({ report }: { report: MonthlySummary }) {
@@ -32,7 +39,7 @@ export function MonthlySummaryCards({ report }: { report: MonthlySummary }) {
       <section className="summary-stat" aria-label="End-of-month balance">
         <h3 className="summary-label">End-of-month balance</h3>
         <span className="summary-period">{monthLabel(previous)}</span>
-        <BalanceDetail value={previous.actualBalance} />
+        <BalanceDetail value={previous.actualBalance} rateConfigured={report.rateConfigured} />
       </section>
       <section className="summary-stat" aria-label="Current month">
         <h3 className="summary-label">Current month</h3>

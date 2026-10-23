@@ -58,6 +58,7 @@ export interface LeaveEntry {
 }
 
 export interface LeaveSettings {
+  ptoAccrualRate: number | null; // PTO hours per worked hour, up to 8 decimal places; null = unconfigured.
   openingMonth: string;
   openingPto: number;
   openingHoliday: number;

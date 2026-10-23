@@ -22,10 +22,10 @@ describe('Calculations & Precision Rules (Section 6)', () => {
     });
 
     it('rounds leave accruals and balances to nearest 0.01 hour', () => {
-      expect(roundToHundredth(8.514)).toBe(8.51);
-      expect(roundToHundredth(8.515)).toBe(8.52);
-      expect(roundToHundredth(0.0851 * 80)).toBe(6.81);
-      expect(roundToHundredth(0.0851 * 160)).toBe(13.62);
+      expect(roundToHundredth(12.344)).toBe(12.34);
+      expect(roundToHundredth(12.345)).toBe(12.35);
+      expect(roundToHundredth(0.125 * 80)).toBe(10);
+      expect(roundToHundredth(0.125 * 160)).toBe(20);
     });
   });
 

@@ -21,24 +21,21 @@ describe('Monthly report load normalization', () => {
     expect(normalizeMonthlyReport(null, sampleFallback).settings.openingMonth).toBe('2026-01');
   });
 
-  it.each([
-    null,
-    {},
-    { entries: null },
-    { entries: {} },
-    { entries: 'not an array' },
-  ])('returns the full fallback for missing or invalid entries: %j', (saved) => {
-    const fallback = createDefaultMonthlyReport(2026);
-    fallback.settings.openingPto = 40;
-    fallback.projectedWork = { '2026-11': 120 };
-    const before = structuredClone(fallback);
+  it.each([null, {}, { entries: null }, { entries: {} }, { entries: 'not an array' }])(
+    'returns the full fallback for missing or invalid entries: %j',
+    (saved) => {
+      const fallback = createDefaultMonthlyReport(2026);
+      fallback.settings.openingPto = 40;
+      fallback.projectedWork = { '2026-11': 120 };
+      const before = structuredClone(fallback);
 
-    // Malformed saved JSON is intentionally outside the declared report shape.
-    const normalized = normalizeMonthlyReport(saved as MonthlyReportState | null, fallback);
+      // Malformed saved JSON is intentionally outside the declared report shape.
+      const normalized = normalizeMonthlyReport(saved as MonthlyReportState | null, fallback);
 
-    expect(normalized).toEqual(before);
-    expect(fallback).toEqual(before);
-  });
+      expect(normalized).toEqual(before);
+      expect(fallback).toEqual(before);
+    },
+  );
 
   it('fills missing settings from the supplied fallback while accepting an empty entries list', () => {
     const fallback = createDefaultMonthlyReport(2026);
@@ -58,7 +55,10 @@ describe('Monthly report load normalization', () => {
     const originalSaved = structuredClone(saved);
     const originalFallback = structuredClone(fallback);
 
-    const normalized = normalizeMonthlyReport(saved as unknown as Partial<MonthlyReportState>, fallback);
+    const normalized = normalizeMonthlyReport(
+      saved as unknown as Partial<MonthlyReportState>,
+      fallback,
+    );
 
     expect(normalized.settings).toEqual({ ...fallback.settings, openingPto: 12.5 });
     expect(saved).toEqual(originalSaved);
@@ -68,6 +68,7 @@ describe('Monthly report load normalization', () => {
   it('preserves explicit zero settings instead of replacing them with nonzero fallback values', () => {
     const fallback = createDefaultMonthlyReport(2026);
     fallback.settings = {
+      ptoAccrualRate: null,
       openingMonth: '2026-01',
       openingPto: 40,
       openingHoliday: 24,
@@ -79,9 +80,13 @@ describe('Monthly report load normalization', () => {
       settings: { openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 0 },
     };
 
-    const normalized = normalizeMonthlyReport(saved as unknown as Partial<MonthlyReportState>, fallback);
+    const normalized = normalizeMonthlyReport(
+      saved as unknown as Partial<MonthlyReportState>,
+      fallback,
+    );
 
     expect(normalized.settings).toEqual({
+      ptoAccrualRate: null,
       openingMonth: '2026-01',
       openingPto: 0,
       openingHoliday: 0,
@@ -109,4 +114,14 @@ describe('Monthly report load normalization', () => {
     expect(saved).toEqual(originalSaved);
     expect(fallback).toEqual(originalFallback);
   });
+});
+
+it('keeps personal rate configuration explicitly missing and never invents a fallback rate', () => {
+  expect(createDefaultMonthlyReport().settings.ptoAccrualRate).toBeNull();
+  expect(normalizeMonthlyReport({ entries: [] }).settings.ptoAccrualRate).toBeNull();
+  const state = createDefaultMonthlyReport(2035);
+  state.settings.ptoAccrualRate = 0;
+  expect(normalizeMonthlyReport(state).settings.ptoAccrualRate).toBe(0);
+  state.settings.ptoAccrualRate = 0.12345678;
+  expect(normalizeMonthlyReport(state).settings.ptoAccrualRate).toBe(0.12345678);
 });
