@@ -50,9 +50,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isSample, leaveSetti
         </dl>
         {workspace.error && <><p className="form-error" role="alert">{workspace.error}</p><button type="button" className="btn-secondary" onClick={workspace.reload}>Retry loading data</button></>}
         {!isSample && connection.error && <p className="form-error" role="alert">{connection.error}</p>}
+        {!isSample && <SupabaseSettings connection={connection} workspace={workspace} />}
       </section>
 
-      {!isSample && <SupabaseSettings connection={connection} workspace={workspace} />}
       {isSample && <section className="calculator-card sample-settings" aria-labelledby="sample-controls-title">
         <h3 id="sample-controls-title" className="card-title">Sample controls</h3>
         <p className="settings-description">Reset restores the original time entries, leave and forecast settings, and POP definitions in this sample workspace.</p>

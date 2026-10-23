@@ -42,8 +42,8 @@ export const SupabaseAccess: React.FC<{ connection: SupabaseConnection; workspac
 export const SupabaseSettings: React.FC<{ connection: SupabaseConnection; workspace: Workspace }> = ({ connection, workspace }) => {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  return <section className="calculator-card supabase-settings" aria-labelledby="supabase-settings-title">
-    <h3 id="supabase-settings-title" className="card-title">Account & connection</h3>
+  return <div className="supabase-settings" aria-labelledby="supabase-settings-title">
+    <h4 id="supabase-settings-title" className="card-title">Account & connection</h4>
     {connection.session ? <div className="sample-actions">
       <button type="button" className="btn-secondary" disabled={busy || workspace.busy} onClick={async () => {
         setBusy(true); setError('');
@@ -55,7 +55,7 @@ export const SupabaseSettings: React.FC<{ connection: SupabaseConnection; worksp
       : connection.config ? <SupabaseSignIn connection={connection} />
       : <p>Enter your public connection details in Advanced project setup to sign in.</p>}
     {error && <p className="form-error" role="alert">{error}</p>}
-  </section>;
+  </div>;
 };
 
 export const SupabaseProjectSettings: React.FC<{ connection: SupabaseConnection; disabled: boolean }> = ({ connection, disabled }) => {

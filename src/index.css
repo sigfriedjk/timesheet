@@ -1102,3 +1102,6 @@ button:disabled { cursor: wait; }
 .pop-stats.pop-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .pop-summary-card { min-width: 0; }
 @media (max-width: 699px) { .pop-stats.pop-summary-cards { grid-template-columns: minmax(0, 1fr); } }
+
+.data-source-settings .supabase-settings { margin: 1rem 0 0; padding-top: 1rem; border-top: 1px solid var(--border-subtle); }
+.data-source-settings .supabase-settings h4 { font-size: 1rem; margin-bottom: .75rem; }
