@@ -149,3 +149,19 @@ describe('Workspace persistence and isolation', () => {
     expect(localStorage.getItem('work_hours_tracker_personal_monthly_report')).toBe(original);
   });
 });
+
+it('autofills the sample atomically, preserves existing records, and never writes personal data', async () => {
+  saveTimeLog('2026-11-02', 3, 'Personal original');
+  const { result } = renderHook(() => useWorkspace('sample2026', null));
+  await waitFor(() => expect(result.current.ready).toBe(true));
+  await act(async () => { await result.current.saveLog('2026-11-02', 0, 'Sample leave'); });
+  await act(async () => { expect(await result.current.fillMonth('2026-11')).toBe(20); });
+  expect(result.current.logs.find(log => log.date === '2026-11-02')).toMatchObject({ totalHours: 0, notes: 'Sample leave' });
+  await act(async () => { expect(await result.current.fillMonth('2026-11')).toBe(0); });
+  expect(getAllTimeLogs()[0]).toMatchObject({ totalHours: 3, notes: 'Personal original' });
+  const before = JSON.stringify(result.current.logs);
+  const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage full'); });
+  await act(async () => { await expect(result.current.fillMonth('2026-12')).rejects.toThrow('Storage full'); });
+  write.mockRestore();
+  expect(JSON.stringify(result.current.logs)).toBe(before);
+});

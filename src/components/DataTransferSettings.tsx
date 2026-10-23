@@ -29,7 +29,7 @@ export const DataTransferSettings: React.FC<{ workspace: Workspace; account: str
   };
   return <section className="calculator-card data-transfer-settings" aria-labelledby="data-transfer-title">
     <h3 id="data-transfer-title" className="card-title">Backup & restore</h3>
-    <p className="settings-description">Back up all saved inputs: time entries and notes, POP names/dates/funding, monthly PTO/Holiday/Birthday/Overhead/PTO adjustments, opening balances, and forecast settings. Monthly balances are recalculated; birthday credit is always in January.</p>
+    <p className="settings-description">Back up all saved inputs: time entries and notes, POP names/dates/funding, monthly PTO/Holiday/Birthday/Overhead/PTO adjustments, opening balances, and leave settings. Monthly balances are recalculated; birthday credit is always in January.</p>
     <div className="sample-actions">
       <button type="button" className="btn-secondary" disabled={disabled} onClick={() => void run(async () => {
         downloadJson(`timesheet-${dataset}-${new Date().toISOString().slice(0, 10)}.json`, exportTimesheetJson(workspace.logs, workspace.report, dataset, workspace.periods));
@@ -56,7 +56,7 @@ export const DataTransferSettings: React.FC<{ workspace: Workspace; account: str
     }} />
     {reading && <p role="status">Reading JSON file…</p>}
     {file && <p className="json-import-preview">{file.name}: {file.backup.logs.length} time entries; {file.backup.report?.entries.length ?? 0} leave/adjustment entries; {file.backup.periods?.length ?? 'default'} POPs.</p>}
-    <p className="settings-description">Import replaces every time entry, leave/adjustment entry, POP definition, opening balance, and saved forecast setting in your signed-in account only. Existing data absent from the file is removed. Export a backup first if you want to keep it.</p>
+    <p className="settings-description">Import replaces every time entry, leave/adjustment entry, POP definition, opening balance, and saved report setting in your signed-in account only. Existing data absent from the file is removed. Export a backup first if you want to keep it.</p>
     {file && (!file.backup.report || file.backup.periods === undefined) && <p role="note">This older file is incomplete. Missing leave/settings reset to defaults; missing POP definitions reset to the original POP list.</p>}
     <label className="restore-confirmation"><input type="checkbox" checked={confirmed} disabled={disabled || !file} onChange={event => setConfirmed(event.target.checked)} /><span>Replace all data in My data with this file.</span></label>
     <div className="sample-actions"><button type="button" className="btn-primary" disabled={disabled || !file || !confirmed} onClick={() => void run(async () => {

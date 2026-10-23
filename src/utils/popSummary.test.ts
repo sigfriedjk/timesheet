@@ -33,13 +33,13 @@ describe('POP summary', () => {
     expect(JSON.stringify(logs)).toBe(before);
   });
 
-  it('assigns boundary, weekend, and holiday work once and excludes future/out-of-range logs', () => {
+  it('assigns boundary, weekend, and holiday work once and includes future forecasts and excludes out-of-range logs', () => {
     const logs = [log('2024-11-30', 5), log('2024-12-01', 6), log('2025-01-01', 7), log('2025-01-17', 8), log('2025-01-18', 9), log('2025-02-18', 10), log('2025-02-19', 11)];
     const result = buildPopSummary(logs, POP_PERIODS.slice(3, 5), '2025-02-18');
     expect(result.rows.map(row => row.workedHours)).toEqual([21, 19]);
     expect(result.totals.workedHours).toBe(40);
     const earlier = buildPopSummary(logs, POP_PERIODS.slice(3, 5), '2025-01-17');
-    expect(earlier.rows[1].workedHours).toBe(0);
+    expect(earlier.rows[1]).toMatchObject({ workedHours: 19, actualHours: 0, forecastHours: 19 });
     expect(earlier.rows[1].status).toBe('Upcoming');
   });
 
@@ -71,4 +71,19 @@ describe('POP summary', () => {
     expect(dst.rows[0].weekdays).toBe(1);
     expect(() => buildPopSummary([], [period('2026-03-09', '2026-03-07', 0)], '2026-03-31')).toThrow('Invalid range');
   });
+});
+
+it('sums complete July–June POPs for the year card and uses the active table row for the POP card', async () => {
+  const { buildCurrentPopCards } = await import('./popSummary');
+  const logs = [log('2026-06-30', 20), log('2026-07-01', 9), log('2026-10-23', 7), log('2026-11-02', 6), log('2027-06-30', 3), log('2027-07-01', 20)];
+  const before = JSON.stringify(logs);
+  const result = buildCurrentPopCards(logs, POP_PERIODS, '2026-10-23');
+  const yearPeriods = POP_PERIODS.filter(pop => pop.startDate >= '2026-07-01' && pop.endDate <= '2027-06-30');
+  const funded = yearPeriods.reduce((sum, pop) => sum + pop.targetHours, 0);
+  expect(result.current).toMatchObject({ name: 'POP Q', funded: 708, worked: 22, available: 686 });
+  expect(result.year).toEqual({ startDate: '2026-07-01', endDate: '2027-06-30', funded, worked: 25, available: funded - 25 });
+  expect(buildCurrentPopCards([], POP_PERIODS, '2027-06-30').year.startDate).toBe('2026-07-01');
+  expect(buildCurrentPopCards([], POP_PERIODS, '2026-07-01').year.startDate).toBe('2026-07-01');
+  expect(buildCurrentPopCards([], [], '2026-10-23').current).toBeNull();
+  expect(JSON.stringify(logs)).toBe(before);
 });

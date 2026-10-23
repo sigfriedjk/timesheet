@@ -41,21 +41,20 @@ function balance(pto: number, holiday: number, birthday: number): LeaveBalance {
 function total(entries: LeaveEntry[], category: LeaveEntry['category']) {
   return cents(entries.filter(entry => entry.category === category).reduce((sum, entry) => sum + entry.hours, 0));
 }
-function has(entries: LeaveEntry[], category: LeaveEntry['category']) { return entries.some(entry => entry.category === category); }
 
 /** Include every saved monthly input, empty intervening months and year-end forecasts. */
 export function getMonthlySummaryRange(logs: TimeLog[], state: MonthlyReportState, asOf: string) {
   const months = [state.settings.openingMonth, ...logs.map(log => log.date.slice(0, 7)),
     ...state.entries.map(entry => entry.date.slice(0, 7)), ...Object.keys(state.projectedWork)];
-  const firstMonth = months.reduce((first, month) => month < first ? month : first);
+  const firstMonth = months.reduce((first, month) => month < first ? month : first, asOf.slice(0, 7));
   const lastMonth = `${months.reduce((last, month) => month > last ? month : last, asOf.slice(0, 7)).slice(0, 4)}-12`;
   const firstYear = Number(firstMonth.slice(0, 4)), lastYear = Number(lastMonth.slice(0, 4));
   return { firstMonth, lastMonth, years: Array.from({ length: lastYear - firstYear + 1 }, (_, offset) => firstYear + offset) };
 }
 
-/** Actual leave uses dated entries. Forecasts fill remaining weekday gaps; neither writes daily logs. */
+/** Work and leave forecasts use saved dated entries only. Missing dates contribute zero. */
 export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, selectedYear: number | 'all', asOf: string) {
-  const { settings, entries, projectedWork } = state;
+  const { settings, entries } = state;
   const cutoffMonth = monthIndex(asOf.slice(0, 7));
   const opening = monthIndex(settings.openingMonth);
   const range = getMonthlySummaryRange(logs, state, asOf);
@@ -64,7 +63,6 @@ export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, 
   const historyStart = monthIndex(range.firstMonth);
   const start = Math.min(opening, selectedStart - 11, historyStart, cutoffMonth - 1);
   const end = Math.max(selectedEnd, cutoffMonth);
-  const logMap = new Map(logs.map(log => [log.date, log]));
   const rows = new Map<number, MonthlyRow>();
   let actualBalance = balance(settings.openingPto, settings.openingHoliday, settings.openingBirthday);
   let projectedBalance = { ...actualBalance };
@@ -81,29 +79,16 @@ export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, 
     const futureEntries = monthEntries.filter(entry => entry.date > asOf);
     const weekdays = days.filter(day => !day.isWeekend);
     const holidays = weekdays.filter(day => day.holiday);
-    const futureWeekdayHours = weekdays.filter(day => day.date > asOf).length * DAY_HOURS;
     const actualHolidayUsed = total(actualEntries, 'holiday');
-    const futureHolidayUsed = has(futureEntries, 'holiday') ? total(futureEntries, 'holiday')
-      : holidays.filter(day => day.date > asOf && !(logMap.get(day.date)?.totalHours)).length * DAY_HOURS;
+    const futureHolidayUsed = total(futureEntries, 'holiday');
     const actualBirthdayUsed = total(actualEntries, 'birthday'), futureBirthdayUsed = total(futureEntries, 'birthday');
     const actualOverhead = total(actualEntries, 'overhead'), futureOverhead = total(futureEntries, 'overhead');
     const actualPtoUsed = total(actualEntries, 'pto');
 
-    let futureWork = 0;
-    for (const day of days.filter(day => day.date > asOf)) {
-      const scheduled = logMap.get(day.date);
-      if (scheduled) { futureWork += scheduled.totalHours; continue; }
-      if (day.isWeekend || day.holiday) continue;
-      const timeOff = futureEntries.filter(entry => entry.date === day.date && entry.category !== 'adjustment')
-        .reduce((sum, entry) => sum + entry.hours, 0);
-      futureWork += Math.max(0, DAY_HOURS * settings.workPercent / 100 - timeOff);
-    }
-    if (!completed && Object.prototype.hasOwnProperty.call(projectedWork, key)) {
-      futureWork = Math.max(0, projectedWork[key] - actualHours);
-    }
+    const futureWork = monthLogs.filter(log => log.date > asOf).reduce((sum, log) => sum + log.totalHours, 0);
     const workHours = tenths(actualHours + futureWork);
     const remainingHours = tenths(workHours - actualHours);
-    const futurePtoUsed = completed ? 0 : cents(Math.max(total(futureEntries, 'pto'), futureWeekdayHours - remainingHours - futureHolidayUsed - futureBirthdayUsed - futureOverhead, 0));
+    const futurePtoUsed = total(futureEntries, 'pto');
     const actualPtoAccrued = cents(actualHours * PTO_RATE);
     const accruedPto = cents(workHours * PTO_RATE);
     const accruedHoliday = holidays.length * DAY_HOURS;

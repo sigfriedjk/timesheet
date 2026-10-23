@@ -50,12 +50,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isSample, leaveSetti
         </dl>
         {workspace.error && <><p className="form-error" role="alert">{workspace.error}</p><button type="button" className="btn-secondary" onClick={workspace.reload}>Retry loading data</button></>}
         {!isSample && connection.error && <p className="form-error" role="alert">{connection.error}</p>}
+        {!isSample && <SupabaseSettings connection={connection} workspace={workspace} />}
       </section>
 
-      {!isSample && <SupabaseSettings connection={connection} workspace={workspace} />}
       {isSample && <section className="calculator-card sample-settings" aria-labelledby="sample-controls-title">
         <h3 id="sample-controls-title" className="card-title">Sample controls</h3>
-        <p className="settings-description">Reset restores the original time entries, leave and forecast settings, and POP definitions in this sample workspace.</p>
+        <p className="settings-description">Reset restores the original time entries, leave settings, and POP definitions in this sample workspace.</p>
         <div className="sample-actions">
           <button type="button" className="btn-secondary" disabled={!workspace.ready || workspace.busy} onClick={() => {
             setResetError(''); setStatus('');
@@ -78,12 +78,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isSample, leaveSetti
       </section>}
 
       {workspace.ready ? <>
-        <LeavePolicyForm key={`leave-${sampleRevision}`} settings={leaveSettings} onSave={onSaveLeaveSettings} scope={scope} disabled={workspace.busy} />
         <PopSettings key={`pop-${sampleRevision}`} workspace={workspace} scope={scope} />
+        <LeavePolicyForm key={`leave-${sampleRevision}`} settings={leaveSettings} onSave={onSaveLeaveSettings} scope={scope} disabled={workspace.busy} />
         {!isSample && <DataTransferSettings workspace={workspace} account={connection.session?.user.email ?? ''} project={project} />}
       </> : <section className="calculator-card settings-unavailable" aria-labelledby="workspace-settings-title">
         <h3 id="workspace-settings-title" className="card-title">Workspace settings</h3>
-        <p className="settings-description">{isSample ? 'Leave, forecast, and POP settings will be available when sample data loads.' : connection.session ? 'Leave, forecast, POP, and backup controls will be available when your account data loads.' : 'Sign in and load My data to edit leave, forecasts, and POP definitions, or back up and restore your timesheet.'}</p>
+        <p className="settings-description">{isSample ? 'Leave and POP settings will be available when sample data loads.' : connection.session ? 'Leave, POP, and backup controls will be available when your account data loads.' : 'Sign in and load My data to edit leave settings and POP definitions, or back up and restore your timesheet.'}</p>
       </section>}
       {!isSample && <SupabaseProjectSettings connection={connection} disabled={workspace.busy} />}
     </div>
