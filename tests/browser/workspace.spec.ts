@@ -17,11 +17,6 @@ async function backend(page: Page, signedIn = true) {
     let data: unknown; let status = 200;
     if (path.includes('/auth/')) data = {};
     else if ((method === 'GET' && state.failRead) || (method !== 'GET' && state.failWrite)) { data = { message: 'Simulated connection failure', code: 'TEST' }; status = 500; }
-    else if (path.endsWith('/rpc/import_browser_timesheet')) {
-      const missing = body.p_logs.filter((log: { date: string }) => !state.logs.some(existing => existing.date === log.date));
-      state.logs.push(...missing.map((log: any) => entry(log.date, log.total_hours, log.notes)));
-      data = missing.length;
-    }
     else if (path.endsWith('/rpc/replace_timesheet_workspace')) {
       state.logs = body.p_logs.map((log: any) => entry(log.date, log.total_hours, log.notes));
       state.report = body.p_report; state.periods = body.p_periods;
@@ -52,14 +47,14 @@ async function backend(page: Page, signedIn = true) {
 const nav = (page: Page, name: string) => page.locator('.nav-tab-btn').filter({ hasText: name }).click();
 test.beforeEach(async ({ page }) => { await page.clock.install({ time: new Date('2026-10-22T12:00:00') }); });
 
-test('Settings exposes JSON controls while signed out and explains when old browser data is absent', async ({ page }) => {
+test('Settings exposes JSON controls while signed out without browser migration controls', async ({ page }) => {
   await backend(page, false);
   await page.goto('/?view=settings');
   await expect(page.getByRole('heading', { name: 'Import & export JSON' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Import JSON', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Import existing browser data' })).toBeVisible();
-  await expect(page.getByText('No previous personal records were found in this browser.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Import existing browser data' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Export browser data JSON' })).toHaveCount(0);
 });
 
 test('exports all saved inputs and requires confirmation before replacing every section; failed restores can retry', async ({ page }) => {
@@ -672,4 +667,18 @@ test('POP rows highlight active inclusive boundaries and upcoming periods', asyn
   await page.reload();
   await expect(current).not.toHaveClass(/current-month-row/);
   await expect(page.locator('[data-pop=next]')).toHaveAttribute('aria-current', 'date');
+});
+
+
+test('legacy personal browser records are not offered for import or read into the cloud workspace', async ({ page }) => {
+  const state = await backend(page);
+  const legacy = JSON.stringify([{ id: 'legacy', date: '2025-01-01', totalHours: 9 }]);
+  await page.addInitScript(value => localStorage.setItem('work_hours_tracker_time_logs', value), legacy);
+  await page.goto('/?view=settings');
+  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Import existing browser data' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Export browser data JSON' })).toHaveCount(0);
+  expect(state.requests.some(request => request.path.includes('import_browser'))).toBe(false);
+  expect(state.logs).toHaveLength(1);
+  expect(await page.evaluate(() => localStorage.getItem('work_hours_tracker_time_logs'))).toBe(legacy);
 });

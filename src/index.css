@@ -1028,7 +1028,7 @@ button:disabled { cursor: wait; }
 .form-error { color: var(--danger, #b42318); margin: .75rem 0; overflow-wrap: anywhere; }
 .supabase-setup { margin-top: 1rem; }
 .supabase-setup summary { cursor: pointer; font-weight: 600; padding: .5rem 0; }
-.supabase-setup form, .browser-import { margin-top: 1rem; }
+.supabase-setup form { margin-top: 1rem; }
 .data-transfer-settings .form-label { display: block; margin-top: 1rem; }
 .data-transfer-settings input[type="file"] { box-sizing: border-box; max-width: 100%; }
 .json-import-preview { overflow-wrap: anywhere; }

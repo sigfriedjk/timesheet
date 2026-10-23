@@ -38,7 +38,7 @@ describe('Supabase repository through the real SDK', () => {
     await expect(repository.saveLog('2026-10-21', 8)).rejects.toThrow('Permission denied');
     await expect(repository.saveReport(createDefaultMonthlyReport())).rejects.toThrow('Permission denied');
     await expect(repository.deleteLog('2026-10-21')).rejects.toThrow('Permission denied');
-    await expect(repository.importBrowserData([], null)).rejects.toThrow('Permission denied');
+    await expect(repository.replaceWorkspace([], createDefaultMonthlyReport(), [])).rejects.toThrow('Permission denied');
   });
   it('requires deletion acknowledgement and scopes the date and user', async () => {
     const { repository, requests } = setup(() => json([]));
@@ -53,15 +53,11 @@ describe('Supabase repository through the real SDK', () => {
     expect(JSON.parse(requests[0].init.body as string)).toEqual({ user_id: 'user-a', date: '2026-10-21', total_hours: 8.6, notes: null });
     expect(requests[0].url.searchParams.get('on_conflict')).toBe('user_id,date');
   });
-  it('persists report state and imports logs and report in one RPC', async () => {
+  it('persists report state scoped to the signed-in account', async () => {
     const report = createDefaultMonthlyReport();
-    const { repository, requests } = setup(url => url.pathname.includes('/rpc/') ? json(2) : json({ state: report }));
+    const { repository, requests } = setup(() => json({ state: report }));
     await repository.saveReport(report);
-    const count = await repository.importBrowserData([{ id: 'a', date: '2026-10-21', totalHours: 8.56, notes: 'old', createdAt: '', updatedAt: '' }], report);
-    expect(count).toBe(2);
     expect(JSON.parse(requests[0].init.body as string)).toEqual({ user_id: 'user-a', state: report });
-    expect(requests[1].url.pathname).toBe('/rest/v1/rpc/import_browser_timesheet');
-    expect(JSON.parse(requests[1].init.body as string)).toEqual({ p_logs: [{ date: '2026-10-21', total_hours: 8.6, notes: 'old' }], p_report: report });
   });
   it('ignores removed historical inference flags without altering older report inputs', () => {
     const old = { ...createDefaultMonthlyReport(), ptoPolicyVersion: 0 };

@@ -69,13 +69,6 @@ export function createSupabaseRepository(client: SupabaseClient, userId: string)
       if (typeof data !== 'number') throw new Error('The replacement was not acknowledged. Please reload your data.');
       return data;
     },
-    async importBrowserData(logs: TimeLog[], report: MonthlyReportState | null) {
-      const { data, error } = await client.rpc('import_browser_timesheet', {
-        p_logs: logs.map(log => ({ date: log.date, total_hours: roundToTenth(log.totalHours), notes: log.notes ?? null })),
-        p_report: report,
-      });
-      check(error);
-      return Number(data);
-    },
+
   };
 }

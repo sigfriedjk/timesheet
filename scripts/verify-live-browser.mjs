@@ -72,7 +72,7 @@ export async function verifyLiveBrowser({ site, sessions, fetch }) {
     await page.locator('#day-hours').fill('9.2');
     await page.getByRole('button', { name: 'Save hours', exact: true }).click();
     await page.getByRole('dialog').waitFor({ state: 'detached' });
-    stage = 'persisting leave settings and explicitly importing browser records';
+    stage = 'persisting leave settings';
     await nav('Settings');
     await page.locator('input[name=openingPto]').fill('75.25');
     await page.getByRole('button', { name: 'Save leave settings' }).click();
@@ -87,21 +87,8 @@ export async function verifyLiveBrowser({ site, sessions, fetch }) {
     await page.reload();
     await nav('Settings');
     await page.getByRole('button', { name: 'Edit Edited live POP', exact: true }).waitFor();
-    stage = 'preparing explicit browser import';
-    const legacy = JSON.stringify([
-      { id: 'legacy-conflict', date: '2026-10-01', totalHours: 1 },
-      { id: 'legacy-new', date: '2026-10-22', totalHours: 4.1 },
-    ]);
-    await page.evaluate(value => localStorage.setItem('work_hours_tracker_time_logs', value), legacy);
-    await page.getByRole('button', { name: 'Reload Supabase data' }).click();
-    await page.getByRole('button', { name: 'Import existing browser data' }).waitFor();
-    await wait(() => !document.querySelector('.browser-import button')?.disabled);
-    await page.getByRole('button', { name: 'Import existing browser data' }).click();
-    stage = 'waiting for explicit browser import acknowledgement';
-    await wait(() => document.querySelector('.data-transfer-settings [role=status]')?.textContent.includes('Imported 1'));
-    stage = 'checking import preservation';
-    assert.equal(await page.evaluate(() => localStorage.getItem('work_hours_tracker_time_logs')), legacy);
-    assert.equal(await page.locator('input[name=openingPto]').inputValue(), '75.25');
+    stage = 'checking removed browser migration controls';
+    assert.equal(await page.getByRole('button', { name: 'Import existing browser data' }).count(), 0);
     stage = 'importing a JSON file into the real account';
     const json = JSON.stringify({ format: 'timesheet', version: 2, dataset: 'personal', logs: [{ date: '2026-10-01', totalHours: 1, notes: 'Restored' }, { date: '2026-10-23', totalHours: 5.2 }],
       report: { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 999, openingHoliday: 25, openingBirthday: 3, workPercent: 90, autoPto: false },
