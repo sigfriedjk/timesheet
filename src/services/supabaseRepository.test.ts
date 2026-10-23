@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
-import { createSupabaseRepository, normalizeMonthlyReport } from './supabaseRepository';
-import { createDefaultMonthlyReport } from '../utils/monthlySummary';
+import { createSupabaseRepository } from './supabaseRepository';
+import { createDefaultMonthlyReport, normalizeMonthlyReport } from '../services/monthlyReport';
 
 const row = (date: string) => ({ id: date, date, total_hours: '8.5', notes: null, created_at: 'created', updated_at: 'updated' });
 function setup(handler: (url: URL, init: RequestInit) => Response) {

@@ -2,12 +2,20 @@ import { LeaveCategory, LeaveEntry, TimeLog } from '../types';
 import { roundToHundredth, roundToTenth } from './calculations';
 
 type LeaveUsage = Record<LeaveCategory, number>;
-const emptyUsage = (): LeaveUsage => ({ pto: 0, holiday: 0, birthday: 0, overhead: 0, adjustment: 0 });
+const emptyUsage = (): LeaveUsage => ({
+  pto: 0,
+  holiday: 0,
+  birthday: 0,
+  overhead: 0,
+  adjustment: 0,
+});
 
 /** Group once, retaining input order so precision and dated-entry behavior stay stable. */
 export function groupByMonth<T extends { date: string }>(records: T[]): Map<string, T[]> {
   const months = new Map<string, T[]>();
   for (const record of records) {
+    // Match the report's YYYY-MM- prefix even when loading older, unvalidated local data.
+    if (record.date[7] !== '-') continue;
     const key = record.date.slice(0, 7);
     const month = months.get(key);
     if (month) month.push(record);
@@ -34,7 +42,8 @@ export function monthlyLeave(entries: LeaveEntry[], asOf: string) {
   const planned = emptyUsage();
   for (const entry of entries) {
     const usage = entry.date <= asOf ? actual : planned;
-    if (Object.prototype.hasOwnProperty.call(usage, entry.category)) usage[entry.category] += entry.hours;
+    if (Object.prototype.hasOwnProperty.call(usage, entry.category))
+      usage[entry.category] += entry.hours;
   }
 
   const used = emptyUsage();

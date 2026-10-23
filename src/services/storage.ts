@@ -58,7 +58,9 @@ export function getAllTimeLogs(dataset: LogDataset = 'personal'): TimeLog[] {
     const snapshot = getSampleWorkspace();
     if (snapshot) return [...snapshot.logs].sort((a, b) => b.date.localeCompare(a.date));
   }
-  const data = getItem(dataset === 'sample2026' ? STORAGE_KEYS.SAMPLE_LOGS : STORAGE_KEYS.TIME_LOGS);
+  const data = getItem(
+    dataset === 'sample2026' ? STORAGE_KEYS.SAMPLE_LOGS : STORAGE_KEYS.TIME_LOGS,
+  );
   if (!data) return [];
   try {
     const logs: TimeLog[] = JSON.parse(data);
@@ -71,7 +73,10 @@ export function getAllTimeLogs(dataset: LogDataset = 'personal'): TimeLog[] {
 /**
  * Retrieves a TimeLog by date (YYYY-MM-DD)
  */
-export function getTimeLogByDate(date: string, dataset: LogDataset = 'personal'): TimeLog | undefined {
+export function getTimeLogByDate(
+  date: string,
+  dataset: LogDataset = 'personal',
+): TimeLog | undefined {
   const logs = getAllTimeLogs(dataset);
   return logs.find((log) => log.date === date);
 }
@@ -84,7 +89,7 @@ export function saveTimeLog(
   date: string,
   totalHours: number,
   notes?: string,
-  dataset: LogDataset = 'personal'
+  dataset: LogDataset = 'personal',
 ): { log: TimeLog; isOverwrite: boolean } {
   const logs = getAllTimeLogs(dataset);
   const existingIndex = logs.findIndex((item) => item.date === date);
@@ -115,8 +120,13 @@ export function saveTimeLog(
     logs.push(updatedLog);
   }
 
-  if (dataset === 'sample2026' && getSampleWorkspace()) replaceSampleWorkspace({ ...getSampleWorkspace()!, logs });
-  else setItem(dataset === 'sample2026' ? STORAGE_KEYS.SAMPLE_LOGS : STORAGE_KEYS.TIME_LOGS, JSON.stringify(logs));
+  if (dataset === 'sample2026' && getSampleWorkspace())
+    replaceSampleWorkspace({ ...getSampleWorkspace()!, logs });
+  else
+    setItem(
+      dataset === 'sample2026' ? STORAGE_KEYS.SAMPLE_LOGS : STORAGE_KEYS.TIME_LOGS,
+      JSON.stringify(logs),
+    );
   return { log: updatedLog, isOverwrite };
 }
 
@@ -127,8 +137,13 @@ export function deleteTimeLog(date: string, dataset: LogDataset = 'personal'): b
   const logs = getAllTimeLogs(dataset);
   const filtered = logs.filter((log) => log.date !== date);
   if (filtered.length !== logs.length) {
-    if (dataset === 'sample2026' && getSampleWorkspace()) replaceSampleWorkspace({ ...getSampleWorkspace()!, logs: filtered });
-    else setItem(dataset === 'sample2026' ? STORAGE_KEYS.SAMPLE_LOGS : STORAGE_KEYS.TIME_LOGS, JSON.stringify(filtered));
+    if (dataset === 'sample2026' && getSampleWorkspace())
+      replaceSampleWorkspace({ ...getSampleWorkspace()!, logs: filtered });
+    else
+      setItem(
+        dataset === 'sample2026' ? STORAGE_KEYS.SAMPLE_LOGS : STORAGE_KEYS.TIME_LOGS,
+        JSON.stringify(filtered),
+      );
     return true;
   }
   return false;
@@ -159,7 +174,11 @@ export function setActiveLogDataset(dataset: LogDataset): void {
 /** The sample has its own store; reset never changes personal entries. */
 export function initializeSampleLogs(reset = false): TimeLog[] {
   if (reset) {
-    replaceSampleWorkspace({ logs: createSampleTimeLogs2026(), report: createDefaultMonthlyReport(2026), periods: defaultPeriods() });
+    replaceSampleWorkspace({
+      logs: createSampleTimeLogs2026(),
+      report: createDefaultMonthlyReport(2026),
+      periods: defaultPeriods(),
+    });
     return getAllTimeLogs('sample2026');
   }
   if (!getSampleWorkspace() && getItem(STORAGE_KEYS.SAMPLE_LOGS) === null) {
@@ -168,17 +187,19 @@ export function initializeSampleLogs(reset = false): TimeLog[] {
   return getAllTimeLogs('sample2026');
 }
 
-export const defaultPeriods = (): PeriodOfPerformance[] => POP_PERIODS.map(period => ({ ...period }));
+export const defaultPeriods = (): PeriodOfPerformance[] =>
+  POP_PERIODS.map((period) => ({ ...period }));
 
 function getSampleWorkspace(): WorkspaceData | null {
   const stored = getItem(STORAGE_KEYS.SAMPLE_WORKSPACE);
-  return stored ? JSON.parse(stored) as WorkspaceData : null;
+  return stored ? (JSON.parse(stored) as WorkspaceData) : null;
 }
 
 /** All sample data is replaced in one storage write; a failed write leaves the old snapshot intact. */
 export function replaceSampleWorkspace(data: WorkspaceData): void {
   const stored = JSON.stringify(data);
-  if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEYS.SAMPLE_WORKSPACE, stored);
+  if (typeof window !== 'undefined')
+    window.localStorage.setItem(STORAGE_KEYS.SAMPLE_WORKSPACE, stored);
   memoryStore[STORAGE_KEYS.SAMPLE_WORKSPACE] = stored;
 }
 
@@ -187,20 +208,39 @@ export function getSamplePeriods(): PeriodOfPerformance[] {
 }
 
 export function saveSamplePeriods(periods: PeriodOfPerformance[]): void {
-  replaceSampleWorkspace({ logs: getAllTimeLogs('sample2026'), report: getMonthlyReportState('sample2026'), periods });
+  replaceSampleWorkspace({
+    logs: getAllTimeLogs('sample2026'),
+    report: getMonthlyReportState('sample2026'),
+    periods,
+  });
 }
 
 export function getMonthlyReportState(dataset: LogDataset = 'personal'): MonthlyReportState {
-  const fallback = createDefaultMonthlyReport(dataset === 'sample2026' ? 2026 : new Date().getFullYear());
+  const fallback = createDefaultMonthlyReport(
+    dataset === 'sample2026' ? 2026 : new Date().getFullYear(),
+  );
   try {
-    const stored = dataset === 'sample2026' && getSampleWorkspace() ? JSON.stringify(getSampleWorkspace()!.report) : getItem(`work_hours_tracker_${dataset}_monthly_report`);
+    const stored =
+      dataset === 'sample2026' && getSampleWorkspace()
+        ? JSON.stringify(getSampleWorkspace()!.report)
+        : getItem(`work_hours_tracker_${dataset}_monthly_report`);
     if (!stored) return fallback;
     const parsed = JSON.parse(stored) as MonthlyReportState;
     return normalizeMonthlyReport(parsed, fallback);
-  } catch { return fallback; }
+  } catch {
+    return fallback;
+  }
 }
 
-export function saveMonthlyReportState(state: MonthlyReportState, dataset: LogDataset = 'personal'): void {
-  if (dataset === 'sample2026' && getSampleWorkspace()) replaceSampleWorkspace({ ...getSampleWorkspace()!, report: { ...state, ptoPolicyVersion: 1 } });
-  else setItem(`work_hours_tracker_${dataset}_monthly_report`, JSON.stringify({ ...state, ptoPolicyVersion: 1 }));
+export function saveMonthlyReportState(
+  state: MonthlyReportState,
+  dataset: LogDataset = 'personal',
+): void {
+  if (dataset === 'sample2026' && getSampleWorkspace())
+    replaceSampleWorkspace({ ...getSampleWorkspace()!, report: { ...state, ptoPolicyVersion: 1 } });
+  else
+    setItem(
+      `work_hours_tracker_${dataset}_monthly_report`,
+      JSON.stringify({ ...state, ptoPolicyVersion: 1 }),
+    );
 }
