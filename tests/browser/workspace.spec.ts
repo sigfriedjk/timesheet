@@ -558,3 +558,17 @@ for (const width of [390, 1280]) test(`access and sample settings fit viewport $
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `work/settings-${width}.png`, fullPage: true });
 });
+
+
+test('break presets set minutes without selected toggle styling', async ({ page }) => {
+  await backend(page);
+  await page.goto('/?view=calculator');
+  const input = page.getByLabel('Custom break minutes', { exact: true });
+  for (const minutes of [30, 60, 0, 30]) {
+    const button = page.getByRole('button', { name: `${minutes} min`, exact: true });
+    await button.click();
+    await expect(input).toHaveValue(String(minutes));
+    await expect(button).not.toHaveClass(/chip-active/);
+    await expect(button).not.toHaveAttribute('aria-pressed');
+  }
+});

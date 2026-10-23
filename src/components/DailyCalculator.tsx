@@ -222,7 +222,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                     key={mins}
                     type="button"
                     onClick={() => setBreakMinutes(mins)}
-                    className={`btn-chip ${breakMinutes === mins ? 'chip-active' : ''}`}
+                    className="btn-chip"
                   >
                     {mins} min
                   </button>
