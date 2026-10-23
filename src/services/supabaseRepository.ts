@@ -12,8 +12,7 @@ export function normalizeMonthlyReport(parsed: Partial<MonthlyReportState> | nul
   const fallback = createDefaultMonthlyReport();
   if (!parsed || !Array.isArray(parsed.entries)) return fallback;
   const settings = normalizeLeaveSettings(parsed.settings, fallback.settings);
-  const state = { ptoPolicyVersion: parsed.ptoPolicyVersion ?? 0, settings, entries: parsed.entries, projectedWork: parsed.projectedWork ?? {} };
-  if ((parsed.ptoPolicyVersion ?? 0) < 1) { state.ptoPolicyVersion = 1; state.settings.autoPto = true; }
+  const state = { ptoPolicyVersion: 1, settings, entries: parsed.entries, projectedWork: parsed.projectedWork ?? {} };
   return state;
 }
 

@@ -38,8 +38,6 @@ function report(value: unknown): MonthlyReportState | null {
   const defaults = createDefaultMonthlyReport().settings;
   const settings = value.settings;
   const setting = (key: keyof typeof defaults) => settings[key] === undefined ? defaults[key] : settings[key];
-  const autoPto = setting('autoPto');
-  if (typeof autoPto !== 'boolean') return fail('automatic PTO setting');
   if (value.ptoPolicyVersion !== undefined && value.ptoPolicyVersion !== 0 && value.ptoPolicyVersion !== 1) return fail('PTO policy version');
   const categories: LeaveCategory[] = ['pto', 'holiday', 'birthday', 'overhead', 'adjustment'];
   const entryIds = new Set<string>();
@@ -61,7 +59,6 @@ function report(value: unknown): MonthlyReportState | null {
       openingHoliday: number(setting('openingHoliday'), 'opening holiday balance'),
       openingBirthday: number(setting('openingBirthday'), 'opening birthday balance'),
       workPercent: number(setting('workPercent'), 'work percentage', 0, 200),
-      autoPto: (value.ptoPolicyVersion ?? 0) < 1 ? true : autoPto,
     },
     entries,
     projectedWork: Object.fromEntries(Object.entries(projections).map(([key, hours]) => [month(key, 'projection month'), number(hours, 'projected hours', 0)])),

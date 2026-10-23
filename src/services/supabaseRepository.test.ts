@@ -20,12 +20,12 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
 
 describe('Supabase repository through the real SDK', () => {
   it('pages long histories and scopes every read to the current user', async () => {
-    const report = createDefaultMonthlyReport(); report.settings.autoPto = false;
+    const report = createDefaultMonthlyReport();
     const { repository, requests } = setup(url => url.pathname.endsWith('timesheet_pop_settings') ? json(null) : url.pathname.endsWith('timesheet_reports') ? json({ state: report }) : json(Array.from({ length: url.searchParams.get('offset') === '0' ? 500 : 2 }, () => row('2026-10-21'))));
     const result = await repository.load();
     expect(result.logs).toHaveLength(502);
     expect(result.logs[0]).toMatchObject({ totalHours: 8.5, notes: undefined });
-    expect(result.report.settings.autoPto).toBe(false);
+    expect(result.report.settings).not.toHaveProperty('autoPto');
     expect(requests).toHaveLength(4);
     expect(result.periods).toHaveLength(24);
     expect(requests.every(({ url }) => url.searchParams.get('user_id') === 'eq.user-a')).toBe(true);
@@ -63,11 +63,13 @@ describe('Supabase repository through the real SDK', () => {
     expect(requests[1].url.pathname).toBe('/rest/v1/rpc/import_browser_timesheet');
     expect(JSON.parse(requests[1].init.body as string)).toEqual({ p_logs: [{ date: '2026-10-21', total_hours: 8.6, notes: 'old' }], p_report: report });
   });
-  it('normalizes older reports once and preserves later PTO opt-outs', () => {
+  it('ignores removed historical inference flags without altering older report inputs', () => {
     const old = { ...createDefaultMonthlyReport(), ptoPolicyVersion: 0 };
-    old.settings.autoPto = false;
-    expect(normalizeMonthlyReport(old).settings.autoPto).toBe(true);
-    expect(normalizeMonthlyReport({ ...old, ptoPolicyVersion: 1 }).settings.autoPto).toBe(false);
+    Object.assign(old.settings, { autoPto: true });
+    const original = JSON.stringify(old);
+    expect(normalizeMonthlyReport(old).settings).not.toHaveProperty('autoPto');
+    expect(normalizeMonthlyReport({ ...old, ptoPolicyVersion: 1 }).settings).not.toHaveProperty('autoPto');
+    expect(JSON.stringify(old)).toBe(original);
     expect(normalizeMonthlyReport(null).entries).toEqual([]);
     const withCalculatedData = { ...old, monthlyBalances: { pto: 123 }, settings: { ...old.settings, birthdayMonth: 5 } };
     expect(normalizeMonthlyReport(withCalculatedData)).not.toHaveProperty('monthlyBalances');

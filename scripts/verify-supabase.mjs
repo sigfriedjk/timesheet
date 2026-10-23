@@ -26,7 +26,7 @@ const options = { auth: { persistSession: false, autoRefreshToken: false, detect
 const admin = createClient(projectUrl, secret, options);
 const check = (result, operation) => { if (result.error) throw new Error(`${operation} failed (${result.error.code || result.error.status || 'unknown'}). Inspect project setup; response bodies and tokens are intentionally omitted.`); return result.data; };
 const created = [];
-const report = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100, autoPto: true }, entries: [], projectedWork: {} };
+const report = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100 }, entries: [], projectedWork: {} };
 try {
   // The admin key is needed only for temporary Auth users. Do not assume it has
   // table privileges, or broaden grants just to accommodate a verification tool.
@@ -81,7 +81,7 @@ try {
   assert.deepEqual(check(await b.from('timesheet_pop_settings').update({ periods: [] }).eq('user_id', aId).select(), 'Cross-user POP update'), []);
   assert.deepEqual(check(await b.from('timesheet_pop_settings').delete().eq('user_id', aId).select(), 'Cross-user POP delete'), []);
   assert.ok((await a.from('timesheet_pop_settings').update({ user_id: bId }).eq('user_id', aId)).error, 'POP ownership changes must fail');
-  const restoredReport = { ...report, settings: { ...report.settings, openingPto: 12, autoPto: false },
+  const restoredReport = { ...report, settings: { ...report.settings, openingPto: 12 },
     entries: ['pto', 'holiday', 'birthday', 'overhead', 'adjustment'].map((category, i) => ({ id: category, date: '2026-10-05', category, hours: i === 4 ? -1.25 : i + 1, notes: `Verification ${category}` })), projectedWork: { '2026-11': 120 } };
   const replacement = { p_logs: [{ user_id: bId, date: '2026-10-01', total_hours: 9, notes: 'Replaced verification entry' }], p_report: restoredReport, p_periods: periods };
   assert.equal(check(await a.rpc('replace_timesheet_workspace', replacement), 'Complete workspace replacement'), 1);

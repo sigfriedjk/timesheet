@@ -63,11 +63,10 @@ export interface LeaveSettings {
   openingHoliday: number;
   openingBirthday: number;
   workPercent: number;
-  autoPto: boolean;
 }
 
 export interface MonthlyReportState {
-  ptoPolicyVersion?: number; // One-time migration to automatic historical PTO.
+  ptoPolicyVersion?: number; // Retained for compatibility with older backups.
   settings: LeaveSettings;
   entries: LeaveEntry[];
   projectedWork: Record<string, number>;

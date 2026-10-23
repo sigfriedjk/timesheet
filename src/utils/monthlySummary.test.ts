@@ -34,12 +34,12 @@ describe('Monthly work and leave summary', () => {
     expect(getMonthlySummaryRange([log('2025-01-02', 8)], state, '2026-10-22')).toEqual({ firstMonth: '2025-01', lastMonth: '2028-12', years: [2025, 2026, 2027, 2028] });
   });
 
-  it('matches the sheet weekday/credit/PTO formulas without double counting holidays', () => {
+  it('calculates accruals without inventing historical leave usage', () => {
     const state = createDefaultMonthlyReport(2026);
     const jan = buildMonthlySummary(sample, state, 2026, '2026-10-20').rows[0];
     expect(jan).toMatchObject({ weekdayHours: 176, holidayCount: 2, actualHours: 150.3, workHours: 150.3,
-      leaveNeeded: 25.7, accruedPto: 12.79, accruedHoliday: 16, accruedBirthday: 8, usedPto: 17.7, usedHoliday: 8 });
-    expect(jan.balance).toEqual({ pto: -4.91, holiday: 8, birthday: 8, total: 11.09 });
+      leaveNeeded: 25.7, accruedPto: 12.79, accruedHoliday: 16, accruedBirthday: 8, usedPto: 0, usedHoliday: 0 });
+    expect(jan.balance).toEqual({ pto: 12.79, holiday: 16, birthday: 8, total: 36.79 });
     expect(buildMonthlySummary(sample, state, 2026, '2026-10-20').rows[6].holidayCount).toBe(1);
   });
 
@@ -59,24 +59,16 @@ describe('Monthly work and leave summary', () => {
     expect(changed.yearEndBalance!.total).toBeLessThan(report.yearEndBalance!.total);
   });
 
-  it('defaults to automatic historical PTO gaps, including empty months, with explicit entries overriding them', () => {
+  it('never fills historical gaps, even with a legacy auto-PTO flag, and keeps future forecasts', () => {
     const state = createDefaultMonthlyReport(2026);
-    expect(state.settings.autoPto).toBe(true);
-    let report = buildMonthlySummary(sample, state, 2026, '2026-10-20');
-    expect(report.rows[0].usedPto).toBe(17.7);
-    expect(report.rows[1]).toMatchObject({ actualHours: 0, usedPto: 152 });
-    state.entries.push({ id: 'override', date: '2026-01-31', category: 'pto', hours: 0 });
-    report = buildMonthlySummary(sample, state, 2026, '2026-10-20');
-    expect(report.rows[0].usedPto).toBe(0);
-  });
-
-  it('supports explicitly disabling historical PTO gap-filling without changing future estimates', () => {
-    const state = createDefaultMonthlyReport(2026);
-    state.settings.autoPto = false;
+    Object.assign(state.settings, { autoPto: true });
+    state.entries = [{ id: 'entered', date: '2026-01-09', category: 'pto', hours: 2.5 }];
+    const before = JSON.stringify({ state, sample });
     const report = buildMonthlySummary(sample, state, 2026, '2026-10-20');
-    expect(report.rows[0].usedPto).toBe(0);
-    expect(report.rows[1].usedPto).toBe(0);
+    expect(report.rows[0]).toMatchObject({ usedPto: 2.5, usedHoliday: 0 });
+    expect(report.rows[1]).toMatchObject({ usedPto: 0, usedHoliday: 0 });
     expect(report.rows[10].usedPto).toBe(8.7);
+    expect(JSON.stringify({ state, sample })).toBe(before);
   });
 
   it('accounts for dated usage and signed PTO adjustments while retaining separate balances', () => {
@@ -118,7 +110,7 @@ describe('Monthly work and leave summary', () => {
     const state = createDefaultMonthlyReport(2025);
     state.settings = { ...state.settings, openingMonth: '2025-12', openingPto: 100, openingHoliday: 10, openingBirthday: 5 };
     const report = buildMonthlySummary([log('2025-12-01', 8), log('2026-01-02', 8)], state, 2026, '2026-01-31');
-    expect(report.currentBalance).toEqual({ pto: -218.64, holiday: 10, birthday: 13, total: -195.64 });
+    expect(report.currentBalance).toEqual({ pto: 101.36, holiday: 34, birthday: 13, total: 148.36 });
     Object.assign(state.settings, { birthdayMonth: 5 }); // Old backups cannot change the January policy.
     const mayBirthday = buildMonthlySummary([], state, 2026, '2026-05-01');
     expect(mayBirthday.rows[0].accruedBirthday).toBe(8);
@@ -147,7 +139,7 @@ describe('Monthly work and leave summary', () => {
     const regular = buildMonthlySummary([], createDefaultMonthlyReport(2026), 2026, '2026-12-31');
     expect(regular.totals.accruedHoliday).toBe(88);
     expect(regular.totals.accruedBirthday).toBe(8);
-    expect(regular.currentBalance).toEqual({ pto: -2000, holiday: 0, birthday: 8, total: -1992 });
+    expect(regular.currentBalance).toEqual({ pto: 0, holiday: 88, birthday: 8, total: 96 });
     expect(regular.yearEndBalance).toEqual(regular.rows[11].balance);
   });
 });

@@ -138,13 +138,13 @@ describe('Workspace persistence and isolation', () => {
     expect(result.current.ready).toBe(false);
     act(() => result.current.reload());
     await waitFor(() => expect(result.current.ready).toBe(true));
-    const report = createDefaultMonthlyReport(); report.settings.autoPto = false;
+    const report = createDefaultMonthlyReport();
     await act(async () => { await result.current.saveReport(report); });
-    expect(result.current.report.settings.autoPto).toBe(false);
+    expect(result.current.report.settings).not.toHaveProperty('autoPto');
     saveTimeLog('2026-09-01', 7);
     const original = JSON.stringify({ ...report, ptoPolicyVersion: 0 });
     localStorage.setItem('work_hours_tracker_personal_monthly_report', original);
-    expect(getLegacyReport()?.settings.autoPto).toBe(true);
+    expect(getLegacyReport()?.settings).not.toHaveProperty('autoPto');
     await act(async () => { expect(await result.current.importBrowser()).toBe(1); });
     expect(repo.importBrowserData).toHaveBeenCalledWith(getAllTimeLogs(), getLegacyReport());
     expect(localStorage.getItem('work_hours_tracker_personal_monthly_report')).toBe(original);

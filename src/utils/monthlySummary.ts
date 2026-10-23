@@ -16,7 +16,7 @@ export interface MonthlyRow {
 
 export function createDefaultMonthlyReport(year = new Date().getFullYear()): MonthlyReportState {
   return { ptoPolicyVersion: 1, settings: { openingMonth: `${year}-01`, openingPto: 0, openingHoliday: 0, openingBirthday: 0,
-    workPercent: 94.3, autoPto: true }, entries: [], projectedWork: {} };
+    workPercent: 94.3 }, entries: [], projectedWork: {} };
 }
 
 export function normalizeLeaveSettings(settings: Partial<LeaveSettings> | undefined, defaults: LeaveSettings): LeaveSettings {
@@ -26,7 +26,6 @@ export function normalizeLeaveSettings(settings: Partial<LeaveSettings> | undefi
     openingHoliday: settings?.openingHoliday ?? defaults.openingHoliday,
     openingBirthday: settings?.openingBirthday ?? defaults.openingBirthday,
     workPercent: settings?.workPercent ?? defaults.workPercent,
-    autoPto: settings?.autoPto ?? defaults.autoPto,
   };
 }
 
@@ -82,16 +81,13 @@ export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, 
     const futureEntries = monthEntries.filter(entry => entry.date > asOf);
     const weekdays = days.filter(day => !day.isWeekend);
     const holidays = weekdays.filter(day => day.holiday);
-    const actualWeekdayHours = weekdays.filter(day => day.date <= asOf).length * DAY_HOURS;
     const futureWeekdayHours = weekdays.filter(day => day.date > asOf).length * DAY_HOURS;
-    const actualHolidayUsed = has(actualEntries, 'holiday') ? total(actualEntries, 'holiday')
-      : holidays.filter(day => day.date <= asOf && !(logMap.get(day.date)?.totalHours)).length * DAY_HOURS;
+    const actualHolidayUsed = total(actualEntries, 'holiday');
     const futureHolidayUsed = has(futureEntries, 'holiday') ? total(futureEntries, 'holiday')
       : holidays.filter(day => day.date > asOf && !(logMap.get(day.date)?.totalHours)).length * DAY_HOURS;
     const actualBirthdayUsed = total(actualEntries, 'birthday'), futureBirthdayUsed = total(futureEntries, 'birthday');
     const actualOverhead = total(actualEntries, 'overhead'), futureOverhead = total(futureEntries, 'overhead');
-    const actualPtoUsed = has(actualEntries, 'pto') ? total(actualEntries, 'pto')
-      : settings.autoPto ? cents(Math.max(0, actualWeekdayHours - actualHours - actualHolidayUsed - actualBirthdayUsed - actualOverhead)) : 0;
+    const actualPtoUsed = total(actualEntries, 'pto');
 
     let futureWork = 0;
     for (const day of days.filter(day => day.date > asOf)) {

@@ -198,13 +198,7 @@ export function getMonthlyReportState(dataset: LogDataset = 'personal'): Monthly
     const parsed = JSON.parse(stored) as MonthlyReportState;
     if (!parsed || !Array.isArray(parsed.entries)) return fallback;
     const settings = normalizeLeaveSettings(parsed.settings, fallback.settings);
-    const state = { ptoPolicyVersion: parsed.ptoPolicyVersion ?? 0, settings, entries: parsed.entries, projectedWork: parsed.projectedWork ?? {} };
-    // Apply the requested policy once to existing stores, preserving later user opt-outs.
-    if ((parsed.ptoPolicyVersion ?? 0) < 1) {
-      state.ptoPolicyVersion = 1;
-      state.settings.autoPto = true;
-      saveMonthlyReportState(state, dataset);
-    }
+    const state = { ptoPolicyVersion: 1, settings, entries: parsed.entries, projectedWork: parsed.projectedWork ?? {} };
     return state;
   } catch { return fallback; }
 }

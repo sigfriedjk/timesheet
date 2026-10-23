@@ -32,6 +32,6 @@ export function setEnteredMonthTotal(entries: LeaveEntry[], month: string, categ
     delta = roundToHundredth(delta + reduction);
     if (delta === 0) break;
   }
-  // Keep explicit zero entries: zero PTO/holiday intentionally overrides inference.
+  // Keep explicit zero entries: zero is an entered value distinct from missing data.
   return entries.map(entry => replacements.has(entry.id) ? { ...entry, hours: replacements.get(entry.id)! } : entry);
 }

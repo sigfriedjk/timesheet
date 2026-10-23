@@ -5,7 +5,7 @@ import { MonthlyReportState } from '../../src/types';
 
 const HOST = 'https://yiqquogdutgujsacoezh.supabase.co';
 const A = '11111111-1111-4111-8111-111111111111';
-const report: MonthlyReportState = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100, autoPto: true }, entries: [], projectedWork: {} };
+const report: MonthlyReportState = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100 }, entries: [], projectedWork: {} };
 const entry = (date = '2026-10-01', hours = 8, notes = 'cloud entry') => ({ user_id: A, id: date, date, total_hours: hours, notes, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' });
 async function backend(page: Page, signedIn = true) {
   const state = { logs: [entry()], report, periods: POP_PERIODS.map(period => ({ ...period })), failRead: false, failWrite: false, delay: 0, requests: [] as { path: string; method: string; body: any }[] };
@@ -81,7 +81,7 @@ test('exports all saved inputs and requires confirmation before replacing every 
   await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'broken.json', mimeType: 'application/json', buffer: Buffer.from('[{"date":"2026-02-30","totalHours":8}]') });
   await expect(card.getByRole('alert')).toContainText('Invalid date');
   expect(state.requests.filter(request => request.path.includes('/rpc/'))).toHaveLength(0);
-  const restoredReport = { ...report, settings: { ...report.settings, openingPto: 123, openingHoliday: 45, openingBirthday: 6, autoPto: false, workPercent: 90 },
+  const restoredReport = { ...report, settings: { ...report.settings, openingPto: 123, openingHoliday: 45, openingBirthday: 6, workPercent: 90 },
     entries: ['pto', 'holiday', 'birthday', 'overhead', 'adjustment'].map((category, i) => ({ id: category, date: '2026-10-05', category, hours: i === 4 ? -1.25 : i + 1, notes: `Restore ${category}` })), projectedWork: { '2026-11': 120 } };
   const restoredPeriods = [{ ...POP_PERIODS[0], name: 'Restored POP', startDate: '2026-01-01', endDate: '2026-12-31', targetHours: 1800 }];
   const replacement = { format: 'timesheet', version: 2, dataset: 'personal', logs: [{ date: '2026-10-01', totalHours: 1 }, { date: '2026-10-22', totalHours: 4.1 }], report: restoredReport, periods: restoredPeriods };
@@ -343,7 +343,7 @@ test('Calendar and POP numbers omit trailing decimal zeros in totals, cells, and
 for (const width of [390, 1280]) test(`summaries default to All Years and show every row with page scrolling at ${width}px`, async ({ page }) => {
   const state = await backend(page);
   state.logs = [entry('2025-01-02', 8), entry('2026-01-02', 9), entry('2027-09-01', 10)];
-  state.report = { ...report, settings: { ...report.settings, openingMonth: '2024-11', autoPto: false },
+  state.report = { ...report, settings: { ...report.settings, openingMonth: '2024-11' },
     entries: [{ id: 'january-2026', date: '2026-01-03', category: 'pto', hours: 3 }], projectedWork: { '2028-03': 100 } };
   await page.setViewportSize({ width, height: 900 });
   await page.goto('/?view=monthly');
@@ -452,7 +452,7 @@ test('monthly summary trims zeros, collapses accruals, and edits the five saved 
 test('summary cards use today automatically, refresh at midnight, and keep forecasts separate', async ({ page }) => {
   const state = await backend(page);
   state.logs = [entry('2026-10-21', 7), entry('2026-10-22', 8), entry('2026-10-23', 9)];
-  state.report = { ...report, settings: { ...report.settings, openingMonth: '2026-10', openingPto: 10, openingHoliday: 20, openingBirthday: 30, autoPto: false }, entries: [
+  state.report = { ...report, settings: { ...report.settings, openingMonth: '2026-10', openingPto: 10, openingHoliday: 20, openingBirthday: 30 }, entries: [
     { id: 'pto', date: '2026-10-22', category: 'pto', hours: 2 },
     { id: 'holiday', date: '2026-10-22', category: 'holiday', hours: 3 },
     { id: 'birthday', date: '2026-10-22', category: 'birthday', hours: 4 },
@@ -483,11 +483,12 @@ test('summary cards use today automatically, refresh at midnight, and keep forec
   await expect(page.locator('main').getByRole('button', { name: /settings/i })).toHaveCount(0);
 });
 
-test('monthly editor separates automatic leave from saved zero and clearing restores inference', async ({ page }) => {
+test('monthly editor distinguishes absent values from entered zero without inventing historical leave', async ({ page }) => {
   const state = await backend(page);
+  state.report = { ...report, settings: { ...report.settings, ...{ autoPto: true } } };
   await page.goto('/?view=monthly');
   const february = page.locator('[data-month="2026-02"] .used-pto');
-  await expect(february).not.toHaveText('0');
+  await expect(february).toHaveText('0');
   await page.getByRole('button', { name: 'Edit February 2026 leave', exact: true }).click();
   const editor = page.getByRole('form', { name: 'February 2026' });
   await expect(editor.getByLabel('PTO entered', { exact: true })).toHaveValue('');
@@ -498,8 +499,11 @@ test('monthly editor separates automatic leave from saved zero and clearing rest
   await page.getByRole('button', { name: 'Edit February 2026 leave', exact: true }).click();
   await editor.getByLabel('PTO entered', { exact: true }).fill('');
   await editor.getByRole('button', { name: 'Save month', exact: true }).click();
-  await expect(february).not.toHaveText('0');
+  await expect(february).toHaveText('0');
   expect(state.report.entries).toHaveLength(0);
+  await nav(page, 'Settings');
+  await expect(page.getByLabel('Auto-fill historical PTO gaps')).toHaveCount(0);
+  await expect(page.locator('.leave-policy')).not.toContainText('unlogged weekday hours');
 });
 
 test('report and leave settings preserve drafts on failure and persist on retry', async ({ page }) => {
