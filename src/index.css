@@ -1075,3 +1075,6 @@ button:disabled { cursor: wait; }
 .current-month-breakdown dd { margin: 0; font-family: var(--font-mono); color: var(--text-main); font-size: 1.15rem; }
 .current-month-breakdown small { font-size: 0.65rem; color: var(--text-muted); }
 @media (max-width: 600px) { .current-month-breakdown { gap: 0.8rem 0.5rem; } }
+
+.monthly-table thead .month-column .as-of-control { margin-top: 0.5rem; }
+.monthly-table thead .month-column select { max-width: 100%; }

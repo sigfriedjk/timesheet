@@ -626,3 +626,22 @@ test('saved entries can be filtered by month and year', async ({ page }) => {
   await page.getByLabel('Saved entries month', { exact: true }).selectOption('02');
   await expect(page.getByText('No entries recorded for February 2025.')).toBeVisible();
 });
+
+
+test('monthly cards stay tied to today while the table year changes', async ({ page }) => {
+  const state = await backend(page);
+  state.report = { ...report, settings: { ...report.settings, openingMonth: '2025-12', openingPto: 100 }, entries: [] };
+  state.logs.push(entry('2025-12-02', 8));
+  await page.goto('/?view=monthly');
+  const cards = page.locator('.monthly-stats');
+  await expect(cards.locator('.summary-stat')).toHaveCount(2);
+  await expect(cards).toContainText('September 2026');
+  await expect(cards).toContainText('October 2026');
+  const before = await cards.textContent();
+  const select = page.getByLabel('Monthly summary year', { exact: true });
+  await expect(page.locator('thead .month-column').getByRole('combobox')).toHaveCount(1);
+  await select.selectOption('2025');
+  await expect(page.locator('[data-month="2026-10"]')).toHaveCount(0);
+  await expect(cards).toHaveText(before!);
+  await expect(page.getByText('Calculation details', { exact: true })).toHaveCount(0);
+});
