@@ -655,6 +655,7 @@ test('POP rows highlight active inclusive boundaries and upcoming periods', asyn
     { id: 'next', name: 'Next', startDate: '2026-10-24', endDate: '2026-11-30', targetHours: 100 },
   ];
   await page.goto('/?view=pop');
+  await expect(page.getByText('Calculation details', { exact: true })).toHaveCount(0);
   const current = page.locator('[data-pop=current]');
   await expect(current).toHaveAttribute('aria-current', 'date');
   await expect(current).toHaveClass(/current-month-row/);

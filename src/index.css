@@ -976,9 +976,6 @@ body {
 .projected-row .month-edit small, .monthly-table .projected-value { color: #93c5fd; }
 .monthly-table tfoot th, .monthly-table tfoot td { background: #25344a; font-weight: 700; }
 .negative-value, .summary-stat strong.negative-value { color: #fda4af; }
-.report-rules { margin-top: 1rem; color: var(--text-muted); font-size: 0.8rem; }
-.report-rules summary { cursor: pointer; }
-.report-rules p { margin-top: 0.6rem; }
 .leave-policy { margin-bottom: 1.5rem; }
 .leave-policy form { margin-top: 1rem; }
 .report-settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; margin-bottom: 1rem; }

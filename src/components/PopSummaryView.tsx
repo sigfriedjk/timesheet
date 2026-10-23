@@ -34,10 +34,5 @@ export const PopSummaryView: React.FC<Props> = ({ logs, periods }) => {
         <tfoot><tr><th scope="row" className="month-column">Total</th><td>{report.rows.length} periods</td><td>{t.weekdays}</td><td>{fixed(t.weekdayHours)}</td><td>{fixed(t.targetHours)}</td><td>{fixed(t.fundedPercent)}{t.fundedPercent != null && '%'}</td><td>{fixed(t.workedHours)}</td><td className={t.remainingHours < 0 ? 'negative-value' : ''}>{fixed(t.remainingHours)}</td></tr></tfoot>
       </table>
     </div>
-    <details className="report-rules"><summary>Calculation details</summary>
-      <p>Ranges include both start and end dates. The year filter includes each full POP that overlaps that year; it does not split periods at December 31. Edit POP names, dates, and funded hours in Settings.</p>
-      <p>Weekday hours = Monday–Friday days × 8, including holidays. Funded % = funded hours ÷ weekday hours. Worked hours include logged work in the range, including weekends and holidays. Future logs and estimates are excluded.</p>
-      <p>Funded − worked stays signed: a negative value means work exceeds funding. The total funded percentage uses total funded hours divided by total weekday hours.</p>
-    </details>
   </div>;
 };
