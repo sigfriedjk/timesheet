@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { PeriodOfPerformance, TimeLog } from '../types';
 import { buildPopSummary } from '../utils/popSummary';
 import { useTodayDate } from '../hooks/useTodayDate';
@@ -8,16 +8,10 @@ interface Props { logs: TimeLog[]; periods: PeriodOfPerformance[] }
 const fixed = (value: number | null, digits = 1) => formatNumber(value, digits);
 
 export const PopSummaryView: React.FC<Props> = ({ logs, periods }) => {
-  const years = useMemo(() => Array.from(new Set(periods.flatMap(period => Array.from({ length: Number(period.endDate.slice(0, 4)) - Number(period.startDate.slice(0, 4)) + 1 }, (_, i) => Number(period.startDate.slice(0, 4)) + i)))).sort(), [periods]);
   const asOf = useTodayDate();
-  const [year, setYear] = useState('all');
-  useEffect(() => { if (year !== 'all' && !years.includes(Number(year))) setYear('all'); }, [year, years]);
-  const report = useMemo(() => buildPopSummary(logs, periods, asOf, year === 'all' ? undefined : Number(year)), [logs, periods, asOf, year]);
+  const report = useMemo(() => buildPopSummary(logs, periods, asOf), [logs, periods, asOf]);
   const t = report.totals;
   return <div className="pop-view">
-    <div className="monthly-toolbar">
-      <label className="as-of-control">Periods overlapping<select className="form-input" aria-label="POP year" value={year} onChange={event => setYear(event.target.value)}><option value="all">All Years</option>{years.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
-    </div>
     <div className="pop-stats">
       <div className="summary-stat"><span className="summary-label">Funded hours</span><strong data-stat="pop-funded">{fixed(t.targetHours)}</strong></div>
       <div className="summary-stat"><span className="summary-label">Worked hours</span><strong data-stat="pop-worked">{fixed(t.workedHours)}</strong></div>
