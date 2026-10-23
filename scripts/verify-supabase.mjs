@@ -26,7 +26,7 @@ const options = { auth: { persistSession: false, autoRefreshToken: false, detect
 const admin = createClient(projectUrl, secret, options);
 const check = (result, operation) => { if (result.error) throw new Error(`${operation} failed (${result.error.code || result.error.status || 'unknown'}). Inspect project setup; response bodies and tokens are intentionally omitted.`); return result.data; };
 const created = [];
-const report = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100 }, entries: [], projectedWork: {} };
+const report = { ptoPolicyVersion: 1, settings: { ptoAccrualRate: 0.125, openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100 }, entries: [], projectedWork: {} };
 try {
   // The admin key is needed only for temporary Auth users. Do not assume it has
   // table privileges, or broaden grants just to accommodate a verification tool.
@@ -74,7 +74,7 @@ try {
   check(await a.from('timesheet_logs').update({ total_hours: 9 }).eq('date', '2026-10-01').select().single(), 'Own log update');
   check(await a.from('timesheet_logs').delete().eq('date', '2026-10-02').select().single(), 'Own log delete');
   console.log('Live schema, two-user RLS, anonymous denial, CRUD, report persistence, import conflict preservation, and atomic rollback verified.');
-  const periods = [{ id: 'verification', name: 'Verification POP', startDate: '2026-01-01', endDate: '2026-12-31', targetHours: 1800 }];
+  const periods = [{ id: 'verification', name: 'Fictional verification phase', startDate: '2035-02-03', endDate: '2035-02-16', targetHours: 13.7 }];
   check(await a.from('timesheet_pop_settings').upsert({ user_id: aId, periods }), 'Own POP save');
   assert.deepEqual(check(await b.from('timesheet_pop_settings').select('*').eq('user_id', aId), 'Cross-user POP read'), []);
   assert.ok((await b.from('timesheet_pop_settings').upsert({ user_id: aId, periods: [] })).error, 'Cross-user POP write must fail');
@@ -95,6 +95,8 @@ try {
   assert.equal(check(await a.from('timesheet_logs').select('total_hours').single(), 'Replacement rollback log').total_hours, 9);
   assert.equal(check(await b.from('timesheet_logs').select('total_hours').single(), 'Replacement account isolation').total_hours, 3);
   console.log('Live POP ownership and complete workspace replacement verified, including every leave category, forecast inputs, spoofed-owner denial, rollback, and account isolation.');
+  const { verifyConfigurationBackups } = await import('./verify-configuration-backups.mjs');
+  await verifyConfigurationBackups({ clients, userIds: created });
   if (process.env.SUPABASE_BROWSER_URL) {
     const { verifyLiveBrowser } = await import('./verify-live-browser.mjs');
     await verifyLiveBrowser({ site: process.env.SUPABASE_BROWSER_URL, sessions, fetch });

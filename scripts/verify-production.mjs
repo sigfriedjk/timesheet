@@ -117,7 +117,7 @@ try {
     await send('Page.navigate', { url }, sessionId);
     let ready = false;
     for (let i = 0; i < 200; i++) {
-      ready = await evaluate(name === 'monthly' ? `!!document.querySelector('[data-stat=month-work-hours]')` : name === 'pop' ? `document.querySelector('.pop-table tfoot td:nth-of-type(6)')?.textContent === '1210.7'` : name === 'sample' ? `document.querySelectorAll('.calendar-logged').length === 149` : `!!document.querySelector(${JSON.stringify(selector)})`);
+      ready = await evaluate(name === 'monthly' ? `!!document.querySelector('[data-stat=month-work-hours]')` : name === 'pop' ? `document.querySelectorAll('.pop-table tbody tr').length === 3` : name === 'sample' ? `document.querySelectorAll('.calendar-logged').length === 149` : `!!document.querySelector(${JSON.stringify(selector)})`);
       if (ready) break;
       await delay(200);
     }
@@ -141,9 +141,9 @@ try {
       report.pages.push({ name, url, rendered: true, ...summary });
     } else if (name === 'pop') {
       const summary = await evaluate(`({ rows: document.querySelectorAll('.pop-table tbody tr').length, funded: Number(document.querySelector('.pop-table tfoot td:nth-of-type(4)').textContent), worked: Number(document.querySelector('.pop-table tfoot td:nth-of-type(6)').textContent), remaining: Number(document.querySelector('.pop-table tfoot td:nth-of-type(7)').textContent), active: document.querySelector('.active-pop')?.getAttribute('data-pop') })`);
-      if (summary.rows !== 24 || !(summary.funded > 0) || summary.worked !== 1210.7 || Math.abs(summary.remaining - (summary.funded - summary.worked)) > 0.01) throw new Error(`POP report failed: ${JSON.stringify(summary)}`);
+      if (summary.rows !== 3 || summary.funded !== 367.5 || !(summary.worked > 0) || Math.abs(summary.remaining - (summary.funded - summary.worked)) > 0.01) throw new Error(`POP report failed: ${JSON.stringify(summary)}`);
       if (!await evaluate(`!document.querySelector('select[aria-label="POP year"]') && document.querySelectorAll('.pop-stats .summary-stat').length === 2 && document.querySelector('.pop-table-scroll').scrollHeight <= document.querySelector('.pop-table-scroll').clientHeight + 1`)) throw new Error('POP must show all periods, two cards, and use page scrolling');
-      report.pages.push({ name, url, rendered: true, ...summary, allPeriods: 24 });
+      report.pages.push({ name, url, rendered: true, ...summary, allPeriods: 3 });
     } else report.pages.push({ name, url, rendered: true });
     console.log(`Chrome verified ${name} page: ${url}`);
   }
@@ -152,7 +152,7 @@ try {
   if (!await evaluate(`!!document.querySelector('.settings-view input[value=sample2026]:checked') && !!document.querySelector('.settings-view .sample-coverage')`)) throw new Error('Settings is missing the active sample selection or description');
   if (!await evaluate(`!document.querySelector('.data-transfer-settings, .supabase-settings, .project-settings, input[type=file]') && document.querySelector('.settings-view > section').classList.contains('data-source-settings')`)) throw new Error('Sample Settings must lead with Data source and hide personal transfer/connection controls');
   if (!await evaluate(`!document.querySelector('input[name=autoPto], input[name=workPercent]')`)) throw new Error('Removed forecast/inference settings are still present');
-  if (!await evaluate(`document.querySelectorAll('.pop-settings-table tbody tr').length === 24 && document.querySelector('[data-period="pop-x"]').textContent.includes('2027-06-30')`)) throw new Error('Settings must list all 24 fixed POP ranges');
+  if (!await evaluate(`document.querySelectorAll('.pop-settings-table tbody tr').length === 3 && document.querySelector('[data-period="fictional-orbit"]').textContent.includes('Fictional Orbit')`)) throw new Error('Settings must list all fictional sample phases');
   if (sampleSupabaseRequests.length) throw new Error('Sample views made Supabase requests');
   report.sampleIsolation = { supabaseRequests: sampleSupabaseRequests.length };
   checkingSample = false;
