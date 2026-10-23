@@ -3,7 +3,8 @@ import { SupabaseConnection } from '../../hooks/useSupabaseConnection';
 import { downloadText } from '../../utils/download';
 import baseSql from '../../../supabase/migrations/202610210001_timesheet.sql?raw';
 import workspaceSql from '../../../supabase/migrations/202610220001_complete_workspace.sql?raw';
-const setupSql = `${baseSql}\n${workspaceSql}`;
+import privateConfigurationSql from '../../../supabase/migrations/202610230001_private_workspace_configuration.sql?raw';
+const setupSql = `${baseSql}\n${workspaceSql}\n${privateConfigurationSql}`;
 
 const message = (error: unknown) =>
   error instanceof Error ? error.message : 'The request could not be completed.';
