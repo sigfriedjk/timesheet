@@ -21,7 +21,12 @@ const Cell: React.FC<{ value: number | null | undefined; digits?: number; classN
 
 export const MonthlySummaryView: React.FC<Props> = ({ logs, state, onChange }) => {
   const asOf = useTodayDate();
+  const currentMonth = useRef<HTMLTableRowElement>(null);
+  const [jumpRequest, setJumpRequest] = useState(0);
   const [year, setYear] = useState('all');
+  useEffect(() => {
+    if (jumpRequest) currentMonth.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [year, jumpRequest]);
   const range = useMemo(() => getMonthlySummaryRange(logs, state, asOf), [logs, state, asOf]);
   useEffect(() => { if (year !== 'all' && !range.years.includes(Number(year))) { setYear('all'); setEditing(null); } }, [year, range]);
   const [editing, setEditing] = useState<string | null>(null);
@@ -54,6 +59,7 @@ export const MonthlySummaryView: React.FC<Props> = ({ logs, state, onChange }) =
       </section>
     </div>
     <div className="monthly-toolbar">
+      <button type="button" className="btn-secondary" disabled={saving} onClick={() => { setYear(asOf.slice(0, 4)); setEditing(null); setJumpRequest(value => value + 1); }}>Jump to today</button>
       <button type="button" className="btn-secondary accrual-toggle" aria-expanded={showAccrued} aria-controls="monthly-summary-table" onClick={() => setShowAccrued(!showAccrued)}>{showAccrued ? <ChevronDown size={15} /> : <ChevronRight size={15} />}{showAccrued ? 'Hide accrued' : 'Show accrued'}</button>
     </div>
     {editing && <MonthEditor key={editing} row={report.rows.find(row => row.key === editing)!} asOf={asOf} state={state} onChange={onChange} onClose={closeEditor} onSaving={setSaving} />}
@@ -63,7 +69,7 @@ export const MonthlySummaryView: React.FC<Props> = ({ logs, state, onChange }) =
           <tr><th rowSpan={2} className="month-column" scope="col"><span>Month</span><label className="as-of-control"><select className="form-input" aria-label="Monthly summary year" value={year} disabled={saving} onChange={event => { setYear(event.target.value); setEditing(null); }}><option value="all">All Years</option>{range.years.map(value => <option key={value} value={value}>{value}</option>)}</select></label></th><th colSpan={6} scope="colgroup">Work & trailing 12 months</th>{showAccrued && <th colSpan={3} scope="colgroup" className="accrual-group">Accrued</th>}<th colSpan={4} scope="colgroup" className="usage-group">Used / planned leave</th><th rowSpan={2} scope="col">PTO adj.</th><th colSpan={3} scope="colgroup" className="balance-group">End-of-month balances</th></tr>
           <tr>{['Weekday h', 'Holidays', 'Logged h', 'Work total', '12m total', 'Leave needed', ...(showAccrued ? ['PTO', 'Holiday', 'Birthday'] : []), 'PTO', 'Holiday', 'Birthday', 'Overhead', 'PTO', 'Holiday', 'Birthday'].map((heading, i) => <th key={i} scope="col">{heading}</th>)}</tr>
         </thead>
-        <tbody>{report.rows.map(row => <tr key={row.key} data-month={row.key} aria-current={row.key === asOf.slice(0, 7) ? 'date' : undefined} className={`${row.projected ? 'projected-row ' : ''}${row.key === asOf.slice(0, 7) ? 'current-month-row' : row.key > asOf.slice(0, 7) ? 'future-month-row' : ''}`}>
+        <tbody>{report.rows.map(row => <tr key={row.key} ref={row.key === asOf.slice(0, 7) ? currentMonth : undefined} data-month={row.key} aria-current={row.key === asOf.slice(0, 7) ? 'date' : undefined} className={`${row.projected ? 'projected-row ' : ''}${row.key === asOf.slice(0, 7) ? 'current-month-row' : row.key > asOf.slice(0, 7) ? 'future-month-row' : ''}`}>
           <th scope="row" className="month-column"><button type="button" className="month-edit" disabled={saving} aria-expanded={editing === row.key} aria-controls={editing === row.key ? 'month-editor' : undefined} onClick={event => editMonth(row.key, event.currentTarget)} aria-label={`Edit ${MONTH_NAMES[row.month]} ${row.year} leave`}><span>{MONTH_NAMES[row.month].slice(0, 3)} {row.year}<small>{row.key === asOf.slice(0, 7) ? 'Current month' : row.key > asOf.slice(0, 7) ? 'Forecast' : row.actualHours ? 'Logged' : 'No logs'}</small></span><Edit3 size={13} /></button></th>
           <Cell value={row.weekdayHours} digits={1} /><Cell value={row.holidayCount} digits={0} /><Cell value={row.actualHours} digits={1} />
           <Cell value={row.workHours} digits={1} className={row.projected ? 'projected-value' : ''} title={row.projected ? `${fixed(row.actualHours, 1)} logged + ${fixed(row.remainingHours, 1)} projected` : 'Logged work only'} />

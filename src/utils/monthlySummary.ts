@@ -46,7 +46,7 @@ function total(entries: LeaveEntry[], category: LeaveEntry['category']) {
 export function getMonthlySummaryRange(logs: TimeLog[], state: MonthlyReportState, asOf: string) {
   const months = [state.settings.openingMonth, ...logs.map(log => log.date.slice(0, 7)),
     ...state.entries.map(entry => entry.date.slice(0, 7)), ...Object.keys(state.projectedWork)];
-  const firstMonth = months.reduce((first, month) => month < first ? month : first);
+  const firstMonth = months.reduce((first, month) => month < first ? month : first, asOf.slice(0, 7));
   const lastMonth = `${months.reduce((last, month) => month > last ? month : last, asOf.slice(0, 7)).slice(0, 4)}-12`;
   const firstYear = Number(firstMonth.slice(0, 4)), lastYear = Number(lastMonth.slice(0, 4));
   return { firstMonth, lastMonth, years: Array.from({ length: lastYear - firstYear + 1 }, (_, offset) => firstYear + offset) };
