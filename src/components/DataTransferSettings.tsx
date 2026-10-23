@@ -1,15 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Download, Upload } from 'lucide-react';
+import { downloadText } from '../utils/download';
 import { Workspace } from '../hooks/useWorkspace';
 import { exportTimesheetJson, parseTimesheetJson, TimesheetImport } from '../services/jsonBackup';
-
-function downloadJson(name: string, contents: string) {
-  const href = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
-  const link = document.createElement('a');
-  link.href = href; link.download = name;
-  document.body.append(link); link.click(); link.remove();
-  setTimeout(() => URL.revokeObjectURL(href), 1000);
-}
 
 export const DataTransferSettings: React.FC<{ workspace: Workspace; account: string; project: string }> = ({ workspace, account, project }) => {
   const [file, setFile] = useState<{ name: string; contents: string; backup: TimesheetImport } | null>(null);
@@ -32,7 +25,7 @@ export const DataTransferSettings: React.FC<{ workspace: Workspace; account: str
     <p className="settings-description">Back up all saved inputs: time entries and notes, POP names/dates/funding, monthly PTO/Holiday/Birthday/Overhead/PTO adjustments, opening balances, and leave settings. Monthly balances are recalculated; birthday credit is always in January.</p>
     <div className="sample-actions">
       <button type="button" className="btn-secondary" disabled={disabled} onClick={() => void run(async () => {
-        downloadJson(`timesheet-${dataset}-${new Date().toISOString().slice(0, 10)}.json`, exportTimesheetJson(workspace.logs, workspace.report, dataset, workspace.periods));
+        downloadText(`timesheet-${dataset}-${new Date().toISOString().slice(0, 10)}.json`, exportTimesheetJson(workspace.logs, workspace.report, dataset, workspace.periods), 'application/json');
         setStatus(`Exported ${workspace.logs.length} time entries, ${workspace.report.entries.length} leave/adjustment entries, ${workspace.periods.length} POPs, and all saved settings.`);
       })}><Download size={16} />Export backup</button>
     </div>

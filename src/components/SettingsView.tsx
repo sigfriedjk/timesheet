@@ -4,10 +4,11 @@ import { LeavePolicyForm } from './LeavePolicyForm';
 import { MONTH_NAMES } from '../utils/calendar';
 import { SAMPLE_MONTH_NOTES } from '../services/sampleData';
 import { PopSettings } from './PopSettings';
-import { SupabaseSettings, SupabaseProjectSettings } from './SupabaseSettings';
+import { SupabaseProjectSettings } from './settings/SupabaseProjectSettings';
 import { SupabaseConnection } from '../hooks/useSupabaseConnection';
 import { Workspace } from '../hooks/useWorkspace';
 import { DataTransferSettings } from './DataTransferSettings';
+import { DataSourceSettings } from './settings/DataSourceSettings';
 
 interface SettingsViewProps {
   isSample: boolean;
@@ -26,32 +27,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ isSample, leaveSetti
   const [sampleRevision, setSampleRevision] = useState(0);
   const scope = isSample ? 'this browser’s sample workspace' : 'My data';
   const project = connection.config ? new URL(connection.config.url).host : 'No project configured';
-  const sourceStatus = workspace.error ? 'Could not load your timesheet.'
-    : !isSample && connection.error ? 'Could not verify your sign-in.'
-    : !isSample && !connection.config ? 'Configure a project in Advanced project setup.'
-    : !isSample && !connection.authReady ? 'Checking your sign-in…'
-    : !isSample && !connection.session ? 'Sign in to load My data.'
-    : !workspace.ready ? 'Loading your timesheet…'
-    : workspace.busy ? 'Saving changes…' : 'Ready';
   return (
     <div className="settings-view">
       <div className="view-header"><h2>Settings</h2></div>
-      <section className="calculator-card data-source-settings" aria-labelledby="data-source-title">
-        <h3 id="data-source-title" className="card-title">Data source</h3>
-        <fieldset className="dataset-selector" disabled={workspace.busy}>
-          <legend className="sr-only">Choose personal or sample data</legend>
-          <label className="dataset-option"><input type="radio" name="dataset" value="personal" checked={!isSample} onChange={onUsePersonal} /><span><strong>My data · Supabase</strong><small>Personal timesheet saved to your signed-in account.</small></span></label>
-          <label className="dataset-option"><input type="radio" name="dataset" value="sample2026" checked={isSample} onChange={onUseSample} /><span><strong>2026 sample data · This browser</strong><small>Separate, editable example data.</small></span></label>
-        </fieldset>
-        <p className="settings-description">{isSample ? 'Using 2026 sample data. Settings and edits apply only to this browser’s sample workspace. Your personal timesheet is separate.' : 'Using My data. Settings and edits apply to your signed-in Supabase account.'} Switching sources does not copy data between them.</p>
-        <dl className="source-context">
-          {!isSample && <><div><dt>Account</dt><dd>{connection.session?.user.email ?? 'Not signed in'}</dd></div><div><dt>Project</dt><dd>{project}</dd></div></>}
-          <div><dt>Status</dt><dd role="status">{sourceStatus}</dd></div>
-        </dl>
-        {workspace.error && <><p className="form-error" role="alert">{workspace.error}</p><button type="button" className="btn-secondary" onClick={workspace.reload}>Retry loading data</button></>}
-        {!isSample && connection.error && <p className="form-error" role="alert">{connection.error}</p>}
-        {!isSample && <SupabaseSettings connection={connection} workspace={workspace} />}
-      </section>
+      <DataSourceSettings isSample={isSample} connection={connection} workspace={workspace} onUsePersonal={onUsePersonal} onUseSample={onUseSample} />
 
       {isSample && <section className="calculator-card sample-settings" aria-labelledby="sample-controls-title">
         <h3 id="sample-controls-title" className="card-title">Sample controls</h3>

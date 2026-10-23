@@ -3,7 +3,7 @@ import { ViewTab, TimeLog } from './types';
 import { getActiveLogDataset, setActiveLogDataset, LogDataset } from './services/storage';
 import { useSupabaseConnection } from './hooks/useSupabaseConnection';
 import { useWorkspace } from './hooks/useWorkspace';
-import { SupabaseAccess } from './components/SupabaseSettings';
+import { SupabaseAccess } from './components/SupabaseAccount';
 import { Navigation } from './components/Navigation';
 import { DailyCalculator } from './components/DailyCalculator';
 import { CalendarView } from './components/CalendarView';
