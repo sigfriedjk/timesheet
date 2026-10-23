@@ -20,7 +20,7 @@ export const PopSummaryView: React.FC<Props> = ({ logs, periods }) => {
     </div>
     <div className="monthly-table-scroll pop-table-scroll" tabIndex={0} aria-label="POP summary; scroll horizontally for all columns">
       <table className="monthly-table pop-table">
-        <thead><tr><th scope="col" className="month-column">POP</th><th scope="col">Date range</th><th scope="col">Weekdays</th><th scope="col">Weekday hours</th><th scope="col">Funded hours</th><th scope="col">Funded %</th><th scope="col">Worked</th><th scope="col">Funded − worked</th></tr></thead>
+        <thead><tr><th scope="col" className="month-column">POP</th><th scope="col">Date range</th><th scope="col">Weekdays</th><th scope="col">Weekday hours</th><th scope="col">Funded hours</th><th scope="col">Funded %</th><th scope="col">Worked</th><th scope="col">Available</th></tr></thead>
         <tbody>{report.rows.map(row => <tr key={row.id} data-pop={row.id} aria-current={row.status === 'Active' ? 'date' : undefined} className={row.status === 'Active' ? 'active-pop current-month-row' : row.status === 'Upcoming' ? 'future-month-row' : ''}>
           <th scope="row" className="month-column"><span>{row.name}</span><small className="pop-status">{row.status}</small></th>
           <td className="pop-date-range"><time dateTime={row.startDate}>{row.startDate}</time><span> – </span><time dateTime={row.endDate}>{row.endDate}</time></td>
@@ -35,7 +35,7 @@ export const PopSummaryView: React.FC<Props> = ({ logs, periods }) => {
 const PopSummaryCard: React.FC<{ title: string; period: string; card: PopCard; name: string }> = ({ title, period, card, name }) => <section className="summary-stat pop-summary-card" aria-label={title}>
   <h3 className="summary-label">{title}</h3><span className="summary-period">{period}</span>
   <dl className="current-month-breakdown pop-card-breakdown">
-    {([{ field: 'funded', label: 'Funded' }, { field: 'worked', label: 'Worked' }, { field: 'available', label: 'Funded − worked' }] as const).map(({ field, label }) => <div key={field}>
+    {([{ field: 'funded', label: 'Funded' }, { field: 'worked', label: 'Worked' }, { field: 'available', label: 'Available' }] as const).map(({ field, label }) => <div key={field}>
       <dt>{label}</dt><dd data-stat={`pop-${name}-${field}`} className={card[field] < 0 ? 'negative-value' : ''}>{fixed(card[field])}<small> h</small></dd>
     </div>)}
   </dl>
