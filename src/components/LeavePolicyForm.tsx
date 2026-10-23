@@ -31,7 +31,7 @@ export const LeavePolicyForm: React.FC<{ settings: LeaveSettings; onSave: (setti
       </div>
       <p className="settings-description">Birthday leave is credited in January. Monthly balances are calculated from opening balances, accruals, leave used, and adjustments.</p>
       <p className="settings-description">PTO accrues at 0.0851 per hour worked; holiday credits are added each month and 8 birthday hours in January. Work and leave forecasts use entered records only. Missing dates contribute zero.</p>
-      <div className="sample-actions"><button type="submit" className="btn-primary">{busy ? 'Saving…' : 'Save leave settings'}</button><span role="status">{saved ? `Leave and forecast settings saved to ${scope}.` : ''}</span></div>
+      <div className="sample-actions"><button type="submit" className="btn-primary">{busy ? 'Saving…' : 'Save leave settings'}</button><span role="status">{saved ? `Leave settings saved to ${scope}.` : ''}</span></div>
       {error && <p className="form-error" role="alert">{error}</p>}
     </fieldset></form>
     </details>

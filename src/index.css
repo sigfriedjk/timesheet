@@ -1105,3 +1105,4 @@ button:disabled { cursor: wait; }
 
 .data-source-settings .supabase-settings { margin: 1rem 0 0; padding-top: 1rem; border-top: 1px solid var(--border-subtle); }
 .data-source-settings .supabase-settings h4 { font-size: 1rem; margin-bottom: .75rem; }
+.pop-card-breakdown dd.negative-value { color: #fda4af; }

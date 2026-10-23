@@ -74,6 +74,7 @@ export async function verifyLiveBrowser({ site, sessions, fetch }) {
     await page.getByRole('dialog').waitFor({ state: 'detached' });
     stage = 'persisting leave settings';
     await nav('Settings');
+    await page.locator('.leave-settings > summary').click();
     await page.locator('input[name=openingPto]').fill('75.25');
     await page.getByRole('button', { name: 'Save leave settings' }).click();
     await wait(() => document.querySelector('.leave-policy [role=status]')?.textContent.includes('saved'));

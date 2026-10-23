@@ -117,7 +117,7 @@ try {
     await send('Page.navigate', { url }, sessionId);
     let ready = false;
     for (let i = 0; i < 200; i++) {
-      ready = await evaluate(name === 'monthly' ? `!!document.querySelector('[data-stat=month-logged-hours]')` : name === 'pop' ? `document.querySelector('[data-stat=pop-worked]')?.textContent === '1210.7'` : name === 'sample' ? `document.querySelectorAll('.calendar-logged').length === 149` : `!!document.querySelector(${JSON.stringify(selector)})`);
+      ready = await evaluate(name === 'monthly' ? `!!document.querySelector('[data-stat=month-work-hours]')` : name === 'pop' ? `document.querySelector('.pop-table tfoot td:nth-of-type(6)')?.textContent === '1210.7'` : name === 'sample' ? `document.querySelectorAll('.calendar-logged').length === 149` : `!!document.querySelector(${JSON.stringify(selector)})`);
       if (ready) break;
       await delay(200);
     }
@@ -133,22 +133,16 @@ try {
       if (!cleanCalendar) throw new Error('Calendar contains removed sample controls, title, or month-card details');
       report.pages.push({ name, url, rendered: true, ...counts });
     } else if (name === 'monthly') {
-      const summary = await evaluate(`({ rows: document.querySelectorAll('.monthly-table tbody tr').length, expectedRows: (Math.max(2026, new Date().getFullYear()) - 2026 + 1) * 12, cards: document.querySelectorAll('.monthly-stats .summary-stat').length, actual: parseFloat(document.querySelector('[data-stat=month-logged-hours]').textContent), forecast: parseFloat(document.querySelector('[data-stat=month-work-hours]').textContent), cutoffControls: document.querySelectorAll('.monthly-view input[type=date]').length })`);
+      const summary = await evaluate(`({ rows: document.querySelectorAll('.monthly-table tbody tr').length, expectedRows: (Math.max(2026, new Date().getFullYear()) - 2026 + 1) * 12, cards: document.querySelectorAll('.monthly-stats .summary-stat').length, actual: Number(document.querySelector('.monthly-table tbody tr[aria-current="date"] td:nth-of-type(3)').textContent), forecast: parseFloat(document.querySelector('[data-stat=month-work-hours]').textContent), cutoffControls: document.querySelectorAll('.monthly-view input[type=date]').length })`);
       if (summary.rows !== summary.expectedRows || summary.cards !== 2 || !Number.isFinite(summary.actual) || !(summary.forecast >= summary.actual) || summary.cutoffControls !== 0) throw new Error(`Monthly report failed: ${JSON.stringify(summary)}`);
       if (!await evaluate(`document.querySelector('select[aria-label="Monthly summary year"]').value === 'all' && document.querySelector('[data-month="2026-01"] th').textContent.includes('Jan 2026') && document.querySelector('.monthly-table-scroll').scrollHeight <= document.querySelector('.monthly-table-scroll').clientHeight + 1`)) throw new Error('Monthly summary must default to All Years, label month/year pairs, and use page scrolling');
       const enteredPto = await evaluate(`({ january: Number(document.querySelector('[data-month="2026-01"] .used-pto').textContent), february: Number(document.querySelector('[data-month="2026-02"] .used-pto').textContent) })`);
       if (enteredPto.january !== 0 || enteredPto.february !== 0) throw new Error(`Historical PTO must use entered data: ${JSON.stringify(enteredPto)}`);
       report.pages.push({ name, url, rendered: true, ...summary });
     } else if (name === 'pop') {
-      const summary = await evaluate(`({ rows: document.querySelectorAll('.pop-table tbody tr').length, funded: Number(document.querySelector('[data-stat=pop-funded]').textContent), worked: Number(document.querySelector('[data-stat=pop-worked]').textContent), remaining: Number(document.querySelector('[data-stat=pop-remaining]').textContent), active: document.querySelector('.active-pop')?.getAttribute('data-pop') })`);
+      const summary = await evaluate(`({ rows: document.querySelectorAll('.pop-table tbody tr').length, funded: Number(document.querySelector('.pop-table tfoot td:nth-of-type(4)').textContent), worked: Number(document.querySelector('.pop-table tfoot td:nth-of-type(6)').textContent), remaining: Number(document.querySelector('.pop-table tfoot td:nth-of-type(7)').textContent), active: document.querySelector('.active-pop')?.getAttribute('data-pop') })`);
       if (summary.rows !== 24 || !(summary.funded > 0) || summary.worked !== 1210.7 || Math.abs(summary.remaining - (summary.funded - summary.worked)) > 0.01) throw new Error(`POP report failed: ${JSON.stringify(summary)}`);
-      if (!await evaluate(`document.querySelector('select[aria-label="POP year"]').value === 'all' && document.querySelector('.pop-table-scroll').scrollHeight <= document.querySelector('.pop-table-scroll').clientHeight + 1`)) throw new Error('POP must default to All Years and use page scrolling');
-      await evaluate(`(() => { const select = document.querySelector('select[aria-label="POP year"]'); select.value = '2026'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-      for (let i = 0; i < 50 && !await evaluate(`document.querySelectorAll('.pop-table tbody tr').length === 5`); i++) await delay(100);
-      if (!await evaluate(`document.querySelectorAll('.pop-table tbody tr').length === 5 && Number(document.querySelector('[data-stat=pop-funded]').textContent) === 1915`)) throw new Error('POP year filter failed');
-      await evaluate(`(() => { const select = document.querySelector('select[aria-label="POP year"]'); select.value = 'all'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-      for (let i = 0; i < 50 && !await evaluate(`document.querySelectorAll('.pop-table tbody tr').length === 24`); i++) await delay(100);
-      if (!await evaluate(`document.querySelectorAll('.pop-table tbody tr').length === 24`)) throw new Error('POP all-years filter failed');
+      if (!await evaluate(`!document.querySelector('select[aria-label="POP year"]') && document.querySelectorAll('.pop-stats .summary-stat').length === 2 && document.querySelector('.pop-table-scroll').scrollHeight <= document.querySelector('.pop-table-scroll').clientHeight + 1`)) throw new Error('POP must show all periods, two cards, and use page scrolling');
       report.pages.push({ name, url, rendered: true, ...summary, allPeriods: 24 });
     } else report.pages.push({ name, url, rendered: true });
     console.log(`Chrome verified ${name} page: ${url}`);
@@ -157,7 +151,7 @@ try {
   for (let i = 0; i < 50 && !await evaluate(`!!document.querySelector('.settings-view')`); i++) await delay(100);
   if (!await evaluate(`!!document.querySelector('.settings-view input[value=sample2026]:checked') && !!document.querySelector('.settings-view .sample-coverage')`)) throw new Error('Settings is missing the active sample selection or description');
   if (!await evaluate(`!document.querySelector('.data-transfer-settings, .supabase-settings, .project-settings, input[type=file]') && document.querySelector('.settings-view > section').classList.contains('data-source-settings')`)) throw new Error('Sample Settings must lead with Data source and hide personal transfer/connection controls');
-  if (!await evaluate(`!document.querySelector('input[name=autoPto]')`)) throw new Error('Removed automatic PTO setting is still present');
+  if (!await evaluate(`!document.querySelector('input[name=autoPto], input[name=workPercent]')`)) throw new Error('Removed forecast/inference settings are still present');
   if (!await evaluate(`document.querySelectorAll('.pop-settings-table tbody tr').length === 24 && document.querySelector('[data-period="pop-x"]').textContent.includes('2027-06-30')`)) throw new Error('Settings must list all 24 fixed POP ranges');
   if (sampleSupabaseRequests.length) throw new Error('Sample views made Supabase requests');
   report.sampleIsolation = { supabaseRequests: sampleSupabaseRequests.length };
