@@ -18,7 +18,7 @@ export const LeavePolicyForm: React.FC<{ settings: LeaveSettings; onSave: (setti
       try {
       await onSave({ openingMonth: String(data.get('openingMonth')), openingPto: Number(data.get('openingPto')),
         openingHoliday: Number(data.get('openingHoliday')), openingBirthday: Number(data.get('openingBirthday')),
-        workPercent: Number(data.get('workPercent')) });
+        workPercent: settings.workPercent });
       setSaved(true);
       } catch (error) { setError(error instanceof Error ? error.message : 'Could not save settings.'); } finally { setBusy(false); }
     }} onChange={() => setSaved(false)}><fieldset className="async-fields" disabled={busy || disabled}>
@@ -29,12 +29,8 @@ export const LeavePolicyForm: React.FC<{ settings: LeaveSettings; onSave: (setti
         <label>Opening holiday (hours)<input className="form-input" type="number" name="openingHoliday" step="0.01" defaultValue={settings.openingHoliday} required /></label>
         <label>Opening birthday (hours)<input className="form-input" type="number" name="openingBirthday" step="0.01" defaultValue={settings.openingBirthday} required /></label>
       </div>
-      <h4 className="settings-subheading">Forecast assumptions</h4>
-      <div className="report-settings-grid">
-        <label>Future work rate (%)<input className="form-input" type="number" name="workPercent" step="0.1" min="0" max="200" defaultValue={settings.workPercent} required /></label>
-      </div>
       <p className="settings-description">Birthday leave is credited in January. Monthly balances are calculated from opening balances, accruals, leave used, and adjustments.</p>
-      <p className="settings-description">Forecasts use the future work rate on remaining non-holiday weekdays. PTO accrues at 0.0851 per hour worked; holiday credits are added each month and 8 birthday hours in January. The work rate affects future forecasts. Historical leave comes only from entered records.</p>
+      <p className="settings-description">PTO accrues at 0.0851 per hour worked; holiday credits are added each month and 8 birthday hours in January. Work and leave forecasts use entered records only. Missing dates contribute zero.</p>
       <div className="sample-actions"><button type="submit" className="btn-primary">{busy ? 'Saving…' : 'Save leave settings'}</button><span role="status">{saved ? `Leave and forecast settings saved to ${scope}.` : ''}</span></div>
       {error && <p className="form-error" role="alert">{error}</p>}
     </fieldset></form>

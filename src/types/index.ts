@@ -62,14 +62,14 @@ export interface LeaveSettings {
   openingPto: number;
   openingHoliday: number;
   openingBirthday: number;
-  workPercent: number;
+  workPercent: number; // Legacy backup compatibility only; summaries do not use this rate.
 }
 
 export interface MonthlyReportState {
   ptoPolicyVersion?: number; // Retained for compatibility with older backups.
   settings: LeaveSettings;
   entries: LeaveEntry[];
-  projectedWork: Record<string, number>;
+  projectedWork: Record<string, number>; // Legacy monthly totals retained in backups; forecasts use dated entries.
 }
 
 /** Saved inputs only; monthly balances, accruals, and totals are calculated. */

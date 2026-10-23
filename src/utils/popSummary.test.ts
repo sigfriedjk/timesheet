@@ -33,13 +33,13 @@ describe('POP summary', () => {
     expect(JSON.stringify(logs)).toBe(before);
   });
 
-  it('assigns boundary, weekend, and holiday work once and excludes future/out-of-range logs', () => {
+  it('assigns boundary, weekend, and holiday work once and includes future forecasts and excludes out-of-range logs', () => {
     const logs = [log('2024-11-30', 5), log('2024-12-01', 6), log('2025-01-01', 7), log('2025-01-17', 8), log('2025-01-18', 9), log('2025-02-18', 10), log('2025-02-19', 11)];
     const result = buildPopSummary(logs, POP_PERIODS.slice(3, 5), '2025-02-18');
     expect(result.rows.map(row => row.workedHours)).toEqual([21, 19]);
     expect(result.totals.workedHours).toBe(40);
     const earlier = buildPopSummary(logs, POP_PERIODS.slice(3, 5), '2025-01-17');
-    expect(earlier.rows[1].workedHours).toBe(0);
+    expect(earlier.rows[1]).toMatchObject({ workedHours: 19, actualHours: 0, forecastHours: 19 });
     expect(earlier.rows[1].status).toBe('Upcoming');
   });
 

@@ -12,9 +12,10 @@ export function buildPopSummary(logs: TimeLog[], periods: readonly PeriodOfPerfo
         if (date.getUTCDay() !== 0 && date.getUTCDay() !== 6) weekdays++;
       }
       const weekdayHours = weekdays * 8;
-      const workedHours = roundToTenth(logs.filter(log => log.date >= period.startDate && log.date <= period.endDate && log.date <= asOf)
+      const workedHours = roundToTenth(logs.filter(log => log.date >= period.startDate && log.date <= period.endDate)
         .reduce((total, log) => total + log.totalHours, 0));
-      return { ...period, weekdays, weekdayHours, workedHours,
+      const actualHours = roundToTenth(logs.filter(log => log.date >= period.startDate && log.date <= period.endDate && log.date <= asOf).reduce((sum, log) => sum + log.totalHours, 0));
+      return { ...period, weekdays, weekdayHours, workedHours, actualHours, forecastHours: roundToTenth(workedHours - actualHours),
         fundedPercent: weekdayHours ? period.targetHours / weekdayHours * 100 : null,
         remainingHours: roundToTenth(period.targetHours - workedHours),
         status: period.startDate > asOf ? 'Upcoming' : period.endDate < asOf ? 'Completed' : 'Active' };

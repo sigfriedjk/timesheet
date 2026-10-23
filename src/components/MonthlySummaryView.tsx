@@ -114,7 +114,7 @@ const MonthEditor: React.FC<{ row: MonthlyRow; asOf: string; state: MonthlyRepor
       <div className="month-totals-fields">
         {LEAVE_FIELDS.map(({ category, label }, index) => <label key={category}>{label}<input ref={index === 0 ? firstInput : undefined} className="form-input" type="number" min={category === 'adjustment' ? undefined : 0} step="0.01" placeholder="0" value={values[category]} onChange={event => setValues({ ...values, [category]: event.target.value })} /></label>)}
       </div>
-      <p id="month-editor-help" className="settings-description">Hours entered for this month. Blank clears the entered value; enter 0 to explicitly record zero. Past leave uses only entered values. Future forecasts remain estimates.</p>
+      <p id="month-editor-help" className="settings-description">Hours entered for this month. Blank clears the entered value; enter 0 to explicitly record zero. Past leave uses only entered values. Future work and leave use entered records only.</p>
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="sample-actions"><button type="submit" className="btn-primary">{busy ? 'Saving…' : 'Save month'}</button><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button></div>
     </fieldset>

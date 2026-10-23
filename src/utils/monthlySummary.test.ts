@@ -48,18 +48,18 @@ describe('Monthly work and leave summary', () => {
     const before = JSON.stringify(sample);
     const report = buildMonthlySummary(sample, state, 2026, '2026-10-20');
     expect(report.totals.actualHours).toBe(1210.7);
-    expect(report.totals.workHours).toBe(1580.4);
-    expect(report.rows[9]).toMatchObject({ projected: true, actualHours: 97.8, workHours: 158.2, remainingHours: 60.4 });
-    expect(report.rows[10]).toMatchObject({ actualHours: 0, workHours: 143.3, accruedPto: 12.19, usedPto: 8.7 });
+    expect(report.totals.workHours).toBe(1210.7);
+    expect(report.rows[9]).toMatchObject({ projected: true, actualHours: 97.8, workHours: 97.8, remainingHours: 0 });
+    expect(report.rows[10]).toMatchObject({ actualHours: 0, workHours: 0, accruedPto: 0, usedPto: 0 });
     expect(JSON.stringify(sample)).toBe(before);
     state.projectedWork['2026-11'] = 0;
     const changed = buildMonthlySummary(sample, state, 2026, '2026-10-20');
-    expect(changed.rows[10]).toMatchObject({ workHours: 0, accruedPto: 0, usedPto: 152 });
+    expect(changed.rows[10]).toMatchObject({ workHours: 0, accruedPto: 0, usedPto: 0 });
     expect(changed.currentBalance).toEqual(report.currentBalance);
-    expect(changed.yearEndBalance!.total).toBeLessThan(report.yearEndBalance!.total);
+    expect(changed.yearEndBalance).toEqual(report.yearEndBalance);
   });
 
-  it('never fills historical gaps, even with a legacy auto-PTO flag, and keeps future forecasts', () => {
+  it('never fills historical gaps, even with a legacy auto-PTO flag, and never invents future leave', () => {
     const state = createDefaultMonthlyReport(2026);
     Object.assign(state.settings, { autoPto: true });
     state.entries = [{ id: 'entered', date: '2026-01-09', category: 'pto', hours: 2.5 }];
@@ -67,7 +67,7 @@ describe('Monthly work and leave summary', () => {
     const report = buildMonthlySummary(sample, state, 2026, '2026-10-20');
     expect(report.rows[0]).toMatchObject({ usedPto: 2.5, usedHoliday: 0 });
     expect(report.rows[1]).toMatchObject({ usedPto: 0, usedHoliday: 0 });
-    expect(report.rows[10].usedPto).toBe(8.7);
+    expect(report.rows[10].usedPto).toBe(0);
     expect(JSON.stringify({ state, sample })).toBe(before);
   });
 
@@ -83,27 +83,27 @@ describe('Monthly work and leave summary', () => {
     expect(jan.balance).toEqual({ pto: -7.23, holiday: 16, birthday: 6, total: 14.77 });
   });
 
-  it('replaces daily forecasts with future-dated logs and deducts planned leave without changing current balances', () => {
+  it('uses future-dated work and entered planned leave without changing current balances', () => {
     const state = createDefaultMonthlyReport(2026);
     const baseline = buildMonthlySummary(sample, state, 2026, '2026-10-20');
     const withPlan = buildMonthlySummary([...sample, log('2026-10-21', 10)], state, 2026, '2026-10-20');
     expect(withPlan.totals.actualHours).toBe(baseline.totals.actualHours);
-    expect(withPlan.rows[9].workHours).toBe(160.6);
+    expect(withPlan.rows[9].workHours).toBe(107.8);
     expect(withPlan.currentBalance).toEqual(baseline.currentBalance);
     state.entries.push({ id: 'vacation', date: '2026-11-02', category: 'pto', hours: 8 });
     const vacation = buildMonthlySummary(sample, state, 2026, '2026-10-20');
-    expect(vacation.rows[10].workHours).toBe(135.8);
-    expect(vacation.rows[10].usedPto).toBe(16.2);
+    expect(vacation.rows[10].workHours).toBe(0);
+    expect(vacation.rows[10].usedPto).toBe(8);
     expect(vacation.currentBalance).toEqual(baseline.currentBalance);
   });
 
-  it('honors monthly forecast overrides including zero and never replaces historical actuals', () => {
+  it('ignores legacy monthly overrides and rates without changing entered data', () => {
     const state = createDefaultMonthlyReport(2026);
     state.projectedWork = { '2026-01': 0, '2026-10': 50, '2026-11': 144 };
     const report = buildMonthlySummary(sample, state, 2026, '2026-10-20');
     expect(report.rows[0].workHours).toBe(150.3);
     expect(report.rows[9].workHours).toBe(97.8);
-    expect(report.rows[10]).toMatchObject({ workHours: 144, usedPto: 8, accruedPto: 12.25 });
+    expect(report.rows[10]).toMatchObject({ workHours: 0, usedPto: 0, accruedPto: 0 });
   });
 
   it('carries balances across year boundaries and always credits birthday leave in January', () => {
