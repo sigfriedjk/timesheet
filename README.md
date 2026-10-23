@@ -17,7 +17,7 @@ Hosted statically on **GitHub Pages** with **Node.js** (Vite + React + TypeScrip
 1. **Daily Calculator & Shift Projections (Interface 1):**
    * **Ephemeral Inputs:** In-memory calculation for `Date`, `Time In`, `Time Out` (required), and `Break Duration (mins)`, which defaults to zero. Preset buttons set the break value; typing rounds up to a six-minute increment on blur. Shift labels sit beside their fields; compact time entries such as `1025` normalize to `10:25` on blur.
    * **Real-Time Live Projections:** The Live Calculation card shows elapsed work using the current clock. Saving a shift requires its entered Time Out. The Out Target card’s **Use as Time Out** button copies its displayed time into Entry Creator.
-   * **Out Target:** A combined hours/time-out pair includes a directional control pointing toward the editable field. The other field calculates from Time In and the break duration. Switching direction lets you enter either desired hours or a departure time, and **Use as Time Out** copies the displayed departure time into Entry Creator.
+   * **Out Target:** A combined hours/time-out pair includes a directional control pointing toward the editable field. The other field calculates from Time In and the break duration. Calculated hours for an entered departure time round down to the nearest tenth. Switching direction lets you enter either desired hours or a departure time, and **Use as Time Out** copies the displayed departure time into Entry Creator.
    * **Mandatory Precision & Rounding Rules:**
      * Work hours strictly maintained to the **nearest tenth of an hour** ($0.1$).
      * Leave accrual formulas prepared to the **nearest hundredth of an hour** ($0.01$).
