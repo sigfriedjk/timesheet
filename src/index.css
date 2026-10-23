@@ -1063,3 +1063,7 @@ button:disabled { cursor: wait; }
   .calendar-kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .calendar-kpi-strip .kpi-card:last-child { grid-column: 1 / -1; }
 }
+
+.saved-entries-heading { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
+.saved-entries-heading .card-title { margin: 0; }
+.saved-entries-heading select { width: auto; }

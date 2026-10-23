@@ -609,3 +609,21 @@ test('jump to today selects this year and scrolls to the current calendar month'
   await expect(page.locator('.calendar-today')).toHaveCount(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+
+test('saved entries can be filtered by month and year', async ({ page }) => {
+  const state = await backend(page);
+  state.logs.push(entry('2026-01-05', 7), entry('2025-01-05', 6));
+  await page.goto('/?view=calendar');
+  const rows = page.locator('.logs-table tbody tr');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('2026-10-01');
+  await page.getByLabel('Saved entries month', { exact: true }).selectOption('01');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('2026-01-05');
+  await page.getByLabel('Saved entries year', { exact: true }).selectOption('2025');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('2025-01-05');
+  await page.getByLabel('Saved entries month', { exact: true }).selectOption('02');
+  await expect(page.getByText('No entries recorded for February 2025.')).toBeVisible();
+});
