@@ -10,6 +10,7 @@ import {
   setActiveLogDataset,
   getMonthlyReportState,
   saveMonthlyReportState,
+  getSamplePeriods,
 } from './storage';
 
 describe('Storage Service (Local-First Persistence & Overwrite Logic)', () => {
@@ -99,7 +100,7 @@ describe('Isolated sample workspace', () => {
 describe('Monthly report persistence', () => {
   beforeEach(clearStorageForTesting);
   it.each(['personal', 'sample2026'] as const)('reads legacy %s inputs without enabling inference or rewriting stored records', (dataset) => {
-    const key = `work_hours_tracker_${dataset}_monthly_report`;
+    const key = dataset === 'sample2026' ? 'work_hours_tracker_fictional_sample_2026_monthly_report' : 'work_hours_tracker_personal_monthly_report';
     const legacy = getMonthlyReportState(dataset);
     delete legacy.ptoPolicyVersion;
     Object.assign(legacy.settings, { autoPto: true });
@@ -139,4 +140,22 @@ describe('Monthly report persistence', () => {
     expect(getMonthlyReportState('sample2026').settings.openingPto).toBe(0);
     expect(getMonthlyReportState()).toEqual(personal);
   });
+});
+
+it('does not reuse or delete retired sample configuration from browser storage', () => {
+  clearStorageForTesting();
+  const oldReport = { settings: { ptoAccrualRate: 0.25 }, entries: [], projectedWork: {} };
+  const oldKey = 'work_hours_tracker_sample_2026_workspace';
+  const oldValue = JSON.stringify({ logs: [], report: oldReport, periods: [] });
+  const store = new Map([[oldKey, oldValue], ['work_hours_tracker_sample2026_monthly_report', JSON.stringify(oldReport)]]);
+  vi.stubGlobal('window', { localStorage: {
+    getItem: (name: string) => store.get(name) ?? null,
+    setItem: (name: string, value: string) => store.set(name, value),
+  } });
+  try {
+    expect(initializeSampleLogs()).toHaveLength(149);
+    expect(getMonthlyReportState('sample2026').settings.ptoAccrualRate).toBe(0.04);
+    expect(getSamplePeriods().map(period => period.name)).toEqual(['Fictional Aurora', 'Fictional Comet', 'Fictional Orbit']);
+    expect(store.get(oldKey)).toBe(oldValue);
+  } finally { vi.unstubAllGlobals(); }
 });

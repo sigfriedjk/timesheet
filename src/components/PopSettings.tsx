@@ -31,6 +31,12 @@ export const PopSettings: React.FC<{ workspace: Workspace; scope: string }> = ({
       <p className="settings-description">
         Names, inclusive dates, and funded hours are saved to {scope}.
       </p>
+      {periods.length === 0 && (
+        <p className="settings-description">
+          No periods are defined. Add your POPs below; personal accounts have no default schedule or
+          funding.
+        </p>
+      )}
       <details className="settings-disclosure pop-management">
         <summary>{periods.length} periods · Manage periods</summary>
         <div

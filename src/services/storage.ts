@@ -1,15 +1,20 @@
 import { TimeLog, MonthlyReportState, PeriodOfPerformance, WorkspaceData } from '../types';
-import { POP_PERIODS } from '../config/periodsOfPerformance';
+import { createSampleMonthlyReport, samplePeriods } from '../config/sampleWorkspace';
 import { createDefaultMonthlyReport, normalizeMonthlyReport } from './monthlyReport';
 import { roundToTenth } from '../utils/calculations';
 import { createSampleTimeLogs2026 } from './sampleData';
 
 export type LogDataset = 'personal' | 'sample2026';
 
+const reportStorageKey = (dataset: LogDataset) =>
+  dataset === 'sample2026'
+    ? 'work_hours_tracker_fictional_sample_2026_monthly_report'
+    : 'work_hours_tracker_personal_monthly_report';
+
 const STORAGE_KEYS = {
   TIME_LOGS: 'work_hours_tracker_time_logs',
-  SAMPLE_LOGS: 'work_hours_tracker_sample_2026_logs',
-  SAMPLE_WORKSPACE: 'work_hours_tracker_sample_2026_workspace',
+  SAMPLE_LOGS: 'work_hours_tracker_fictional_sample_2026_logs',
+  SAMPLE_WORKSPACE: 'work_hours_tracker_fictional_sample_2026_workspace',
   ACTIVE_DATASET: 'work_hours_tracker_active_dataset',
   POPS: 'work_hours_tracker_pops',
   LEAVE_ADJUSTMENTS: 'work_hours_tracker_leave_adjustments',
@@ -176,8 +181,8 @@ export function initializeSampleLogs(reset = false): TimeLog[] {
   if (reset) {
     replaceSampleWorkspace({
       logs: createSampleTimeLogs2026(),
-      report: createDefaultMonthlyReport(2026),
-      periods: defaultPeriods(),
+      report: createSampleMonthlyReport(),
+      periods: samplePeriods(),
     });
     return getAllTimeLogs('sample2026');
   }
@@ -187,8 +192,7 @@ export function initializeSampleLogs(reset = false): TimeLog[] {
   return getAllTimeLogs('sample2026');
 }
 
-export const defaultPeriods = (): PeriodOfPerformance[] =>
-  POP_PERIODS.map((period) => ({ ...period }));
+export const defaultPeriods = (): PeriodOfPerformance[] => [];
 
 function getSampleWorkspace(): WorkspaceData | null {
   const stored = getItem(STORAGE_KEYS.SAMPLE_WORKSPACE);
@@ -204,7 +208,7 @@ export function replaceSampleWorkspace(data: WorkspaceData): void {
 }
 
 export function getSamplePeriods(): PeriodOfPerformance[] {
-  return getSampleWorkspace()?.periods ?? defaultPeriods();
+  return getSampleWorkspace()?.periods ?? samplePeriods();
 }
 
 export function saveSamplePeriods(periods: PeriodOfPerformance[]): void {
@@ -216,14 +220,13 @@ export function saveSamplePeriods(periods: PeriodOfPerformance[]): void {
 }
 
 export function getMonthlyReportState(dataset: LogDataset = 'personal'): MonthlyReportState {
-  const fallback = createDefaultMonthlyReport(
-    dataset === 'sample2026' ? 2026 : new Date().getFullYear(),
-  );
+  const fallback =
+    dataset === 'sample2026' ? createSampleMonthlyReport() : createDefaultMonthlyReport();
   try {
     const stored =
       dataset === 'sample2026' && getSampleWorkspace()
         ? JSON.stringify(getSampleWorkspace()!.report)
-        : getItem(`work_hours_tracker_${dataset}_monthly_report`);
+        : getItem(reportStorageKey(dataset));
     if (!stored) return fallback;
     const parsed = JSON.parse(stored) as MonthlyReportState;
     return normalizeMonthlyReport(parsed, fallback);
@@ -238,9 +241,5 @@ export function saveMonthlyReportState(
 ): void {
   if (dataset === 'sample2026' && getSampleWorkspace())
     replaceSampleWorkspace({ ...getSampleWorkspace()!, report: { ...state, ptoPolicyVersion: 1 } });
-  else
-    setItem(
-      `work_hours_tracker_${dataset}_monthly_report`,
-      JSON.stringify({ ...state, ptoPolicyVersion: 1 }),
-    );
+  else setItem(reportStorageKey(dataset), JSON.stringify({ ...state, ptoPolicyVersion: 1 }));
 }

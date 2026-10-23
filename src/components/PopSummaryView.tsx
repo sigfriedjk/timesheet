@@ -18,6 +18,11 @@ export const PopSummaryView: React.FC<Props> = ({ logs, periods }) => {
   const cards = useMemo(() => currentPopCards(report.rows, asOf), [report.rows, asOf]);
   return (
     <div className="pop-view">
+      {periods.length === 0 && (
+        <p className="settings-description" role="status">
+          No POPs are configured. Add periods and funding in Settings.
+        </p>
+      )}
       <div className="pop-stats pop-summary-cards">
         <PopSummaryCard
           title="POP Year"
