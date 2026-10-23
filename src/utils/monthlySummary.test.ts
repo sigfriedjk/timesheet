@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { createDefaultMonthlyReport } from '../services/monthlyReport';
 import { TimeLog } from '../types';
 import { createSampleTimeLogs2026 } from '../services/sampleData';
-import { buildMonthlySummary, createDefaultMonthlyReport, getMonthlySummaryRange } from './monthlySummary';
+import { buildMonthlySummary, getMonthlySummaryRange } from './monthlySummary';
 
 const log = (date: string, totalHours: number): TimeLog => ({ id: date, date, totalHours, createdAt: `${date}T18:00:00Z`, updatedAt: `${date}T18:00:00Z` });
 const sample = createSampleTimeLogs2026();
@@ -163,4 +164,27 @@ it('anchors monthly cards to today across year filters and January boundaries', 
   const unopened = buildMonthlySummary([], createDefaultMonthlyReport(2029), 'all', '2026-01-22');
   expect(unopened.previousMonth.actualBalance).toBeNull();
   expect(unopened.currentMonth.key).toBe('2026-01');
+});
+
+
+it('preserves separate recorded and planned rounding within each month', () => {
+  const state = createDefaultMonthlyReport(2026);
+  state.settings.openingMonth = '2026-10';
+  state.entries = [
+    { id: 'pto-actual', date: '2026-10-23', category: 'pto', hours: 0.006 },
+    { id: 'pto-future', date: '2026-10-24', category: 'pto', hours: 0.006 },
+    { id: 'adjustment-actual', date: '2026-10-23', category: 'adjustment', hours: -0.006 },
+    { id: 'adjustment-future', date: '2026-10-24', category: 'adjustment', hours: 0.006 },
+    { id: 'next-month', date: '2026-11-01', category: 'pto', hours: 20 },
+  ];
+  const report = buildMonthlySummary([
+    log('2026-11-01', 8), log('2026-10-24', 0.04),
+    log('2026-10-23', 8.04), log('2026-09-30', 8),
+  ], state, 'all', '2026-10-23');
+  expect(report.currentMonth).toMatchObject({
+    actualHours: 8, workHours: 8, remainingHours: 0,
+    usedPto: 0.02, adjustment: 0,
+    actualBalance: { pto: 0.66 }, balance: { pto: 0.66 },
+  });
+  expect(report.rows.find(row => row.key === '2026-11')).toMatchObject({ workHours: 8, usedPto: 20 });
 });
