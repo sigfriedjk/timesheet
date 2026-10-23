@@ -572,3 +572,15 @@ test('break presets set minutes without selected toggle styling', async ({ page 
     await expect(button).not.toHaveAttribute('aria-pressed');
   }
 });
+
+
+test('break minutes round up to six-minute increments on blur', async ({ page }) => {
+  await backend(page);
+  await page.goto('/?view=calculator');
+  const input = page.getByLabel('Custom break minutes', { exact: true });
+  for (const [typed, rounded] of [['7', '12'], ['6', '6'], ['6.1', '12'], ['0', '0'], ['479', '480']]) {
+    await input.fill(typed);
+    await input.blur();
+    await expect(input).toHaveValue(rounded);
+  }
+});

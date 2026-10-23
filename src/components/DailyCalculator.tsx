@@ -213,7 +213,8 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                   max="480"
                   step="1"
                   value={breakMinutes}
-                  onChange={(e) => setBreakMinutes(Math.min(480, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+                  onChange={(e) => setBreakMinutes(Math.min(480, Math.max(0, Number(e.target.value) || 0)))}
+                  onBlur={() => setBreakMinutes(minutes => Math.ceil(minutes / 6) * 6)}
                   className="form-input custom-break-input"
                   aria-label="Custom break minutes"
                 />
