@@ -22,12 +22,12 @@ export const SupabaseSignIn: React.FC<{ connection: SupabaseConnection }> = ({ c
           const redirect = new URL('.', window.location.href);
           const { error } = await connection.client.auth.signInWithOtp({
             email: email.trim(),
-            options: { emailRedirectTo: redirect.href },
+            options: { emailRedirectTo: redirect.href, shouldCreateUser: false },
           });
           if (error) throw error;
           setStatus('Check your email for a sign-in link. Open it to return to your timesheet.');
-        } catch (error) {
-          setError(message(error));
+        } catch {
+          setError('Could not send a sign-in link. Use your existing account email and try again shortly.');
         } finally {
           setBusy(false);
         }

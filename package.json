@@ -11,6 +11,8 @@
     "test:watch": "vitest",
     "test:browser": "playwright test",
     "verify:supabase": "node scripts/verify-supabase.mjs",
+    "lock:supabase": "node scripts/lock-supabase.mjs",
+    "verify:admission": "node scripts/verify-admission.mjs",
     "setup:supabase": "node scripts/setup-supabase.mjs"
   },
   "dependencies": {
