@@ -155,8 +155,8 @@ try {
   }
   await evaluate(`Array.from(document.querySelectorAll('.nav-tab-btn')).find(button => button.textContent.trim() === 'Settings').click()`);
   for (let i = 0; i < 50 && !await evaluate(`!!document.querySelector('.settings-view')`); i++) await delay(100);
-  if (!await evaluate(`!!document.querySelector('.settings-view input[value=sample2026]:checked') && !!document.querySelector('.settings-view .sample-coverage')`)) throw new Error('Settings is missing the active sample selection or coverage/downloads');
-  if (!await evaluate(`!!document.querySelector('.data-transfer-settings input[type=file]') && Array.from(document.querySelectorAll('.data-transfer-settings button')).some(button => button.textContent.trim() === 'Export JSON' && !button.disabled) && Array.from(document.querySelectorAll('.data-transfer-settings button')).some(button => button.textContent.trim() === 'Import JSON')`)) throw new Error('Settings is missing visible JSON import/export controls');
+  if (!await evaluate(`!!document.querySelector('.settings-view input[value=sample2026]:checked') && !!document.querySelector('.settings-view .sample-coverage')`)) throw new Error('Settings is missing the active sample selection or description');
+  if (!await evaluate(`!document.querySelector('.data-transfer-settings, .supabase-settings, .project-settings, input[type=file]') && document.querySelector('.settings-view > section').classList.contains('data-source-settings')`)) throw new Error('Sample Settings must lead with Data source and hide personal transfer/connection controls');
   if (!await evaluate(`!document.querySelector('input[name=autoPto]')`)) throw new Error('Removed automatic PTO setting is still present');
   if (!await evaluate(`document.querySelectorAll('.pop-settings-table tbody tr').length === 24 && document.querySelector('[data-period="pop-x"]').textContent.includes('2027-06-30')`)) throw new Error('Settings must list all 24 fixed POP ranges');
   if (sampleSupabaseRequests.length) throw new Error('Sample views made Supabase requests');

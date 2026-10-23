@@ -3,7 +3,7 @@ import { PeriodOfPerformance } from '../types';
 import { Workspace } from '../hooks/useWorkspace';
 import { generateId } from '../services/storage';
 
-export const PopSettings: React.FC<{ workspace: Workspace }> = ({ workspace }) => {
+export const PopSettings: React.FC<{ workspace: Workspace; scope: string }> = ({ workspace, scope }) => {
   const [draft, setDraft] = useState<PeriodOfPerformance | null>(null);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -16,8 +16,8 @@ export const PopSettings: React.FC<{ workspace: Workspace }> = ({ workspace }) =
   };
   return <section className="calculator-card pop-settings" aria-labelledby="pop-settings-title">
     <h3 id="pop-settings-title" className="card-title">Periods of performance</h3>
-    <p className="settings-description">Names, inclusive dates, and funded hours are saved with the selected workspace and included in JSON backups.</p>
-    {!workspace.ready && <p>Sign in and load My data to edit your POP definitions, or switch to sample data.</p>}
+    <p className="settings-description">Names, inclusive dates, and funded hours are saved to {scope}.</p>
+    <details className="settings-disclosure pop-management"><summary>{periods.length} periods · Manage periods</summary>
     <div className="monthly-table-scroll pop-settings-scroll" tabIndex={0} aria-label="POP ranges and funded hours">
       <table className="monthly-table pop-settings-table">
         <thead><tr><th scope="col" className="month-column">POP</th><th scope="col">Start date</th><th scope="col">End date</th><th scope="col">Funded hours</th><th scope="col">Actions</th></tr></thead>
@@ -28,7 +28,7 @@ export const PopSettings: React.FC<{ workspace: Workspace }> = ({ workspace }) =
     {draft && <form className="pop-editor" aria-label="Edit POP" onSubmit={event => {
       event.preventDefault();
       const next = periods.some(period => period.id === draft.id) ? periods.map(period => period.id === draft.id ? draft : period) : [...periods, draft];
-      void save([...next].sort((a, b) => a.startDate.localeCompare(b.startDate)), 'POP definitions saved.');
+      void save([...next].sort((a, b) => a.startDate.localeCompare(b.startDate)), `POP definitions saved to ${scope}.`);
     }}><fieldset className="async-fields" disabled={disabled}>
       <div className="report-settings-grid">
         <label>POP name<input className="form-input" value={draft.name} required onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
@@ -37,9 +37,10 @@ export const PopSettings: React.FC<{ workspace: Workspace }> = ({ workspace }) =
         <label>Funded hours<input className="form-input" type="number" min="0" step="0.1" value={Number.isNaN(draft.targetHours) ? '' : draft.targetHours} required onChange={event => setDraft({ ...draft, targetHours: event.target.value === '' ? NaN : Number(event.target.value) })} /></label>
       </div>
       <div className="sample-actions"><button type="submit" className="btn-primary">{workspace.busy ? 'Saving…' : 'Save POP'}</button><button type="button" className="btn-secondary" onClick={() => setDraft(null)}>Cancel</button>
-        {periods.some(period => period.id === draft.id) && <button type="button" className="btn-secondary" onClick={() => { if (window.confirm(`Delete ${draft.name} from this workspace?`)) void save(periods.filter(period => period.id !== draft.id), 'POP deleted.'); }}>Delete POP</button>}
+        {periods.some(period => period.id === draft.id) && <button type="button" className="btn-secondary" onClick={() => { if (window.confirm(`Delete ${draft.name} from this workspace?`)) void save(periods.filter(period => period.id !== draft.id), `POP deleted from ${scope}.`); }}>Delete POP</button>}
       </div>
     </fieldset></form>}
+    </details>
     <p className="settings-status" role="status">{status}</p>
     {error && <p className="form-error" role="alert">{error}</p>}
   </section>;

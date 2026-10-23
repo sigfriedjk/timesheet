@@ -47,23 +47,28 @@ async function backend(page: Page, signedIn = true) {
 const nav = (page: Page, name: string) => page.locator('.nav-tab-btn').filter({ hasText: name }).click();
 test.beforeEach(async ({ page }) => { await page.clock.install({ time: new Date('2026-10-22T12:00:00') }); });
 
-test('Settings exposes JSON controls while signed out without browser migration controls', async ({ page }) => {
+test('signed-out Settings leads with the source and gates workspace controls', async ({ page }) => {
   await backend(page, false);
   await page.goto('/?view=settings');
-  await expect(page.getByRole('heading', { name: 'Import & export JSON' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Import JSON', exact: true })).toBeDisabled();
+  await expect(page.locator('.settings-view > section').first()).toHaveClass(/data-source-settings/);
+  await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+  await expect(page.locator('.settings-unavailable')).toContainText('Sign in and load My data');
+  await expect(page.locator('.data-transfer-settings, .pop-settings, .leave-policy, .sample-settings')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Import existing browser data' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Export browser data JSON' })).toHaveCount(0);
+  await expect(page.locator('.project-settings details')).not.toHaveAttribute('open', '');
+  await page.getByText('Advanced project setup', { exact: true }).click();
+  await expect(page.getByLabel('Project URL', { exact: true })).toBeVisible();
 });
 
 test('exports all saved inputs and requires confirmation before replacing every section; failed restores can retry', async ({ page }) => {
+  test.slow(); // Includes an intentional SDK write failure and retry, plus backup round-trip checks.
   const state = await backend(page);
   state.logs.push(entry('2026-10-02', 7, 'removed by replacement'));
   await page.goto('/?view=settings');
   const card = page.locator('.data-transfer-settings');
   const downloading = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+  await page.getByRole('button', { name: 'Export backup', exact: true }).click();
   const download = await downloading;
   const backup = JSON.parse(await readFile((await download.path())!, 'utf8'));
   expect(backup.logs).toHaveLength(2);
@@ -73,6 +78,7 @@ test('exports all saved inputs and requires confirmation before replacing every 
   expect(backup.version).toBe(2);
   expect(JSON.stringify(backup)).not.toMatch(/birthdayMonth|monthlyBalances/);
   expect(JSON.stringify(backup)).not.toMatch(/access_token|refresh_token|user_id/);
+  await page.locator('.restore-settings:not([open]) > summary').click();
   await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'broken.json', mimeType: 'application/json', buffer: Buffer.from('[{"date":"2026-02-30","totalHours":8}]') });
   await expect(card.getByRole('alert')).toContainText('Invalid date');
   expect(state.requests.filter(request => request.path.includes('/rpc/'))).toHaveLength(0);
@@ -80,16 +86,18 @@ test('exports all saved inputs and requires confirmation before replacing every 
     entries: ['pto', 'holiday', 'birthday', 'overhead', 'adjustment'].map((category, i) => ({ id: category, date: '2026-10-05', category, hours: i === 4 ? -1.25 : i + 1, notes: `Restore ${category}` })), projectedWork: { '2026-11': 120 } };
   const restoredPeriods = [{ ...POP_PERIODS[0], name: 'Restored POP', startDate: '2026-01-01', endDate: '2026-12-31', targetHours: 1800 }];
   const replacement = { format: 'timesheet', version: 2, dataset: 'personal', logs: [{ date: '2026-10-01', totalHours: 1 }, { date: '2026-10-22', totalHours: 4.1 }], report: restoredReport, periods: restoredPeriods };
+  await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'sample.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ ...replacement, dataset: 'sample2026' })) });
+  await expect(card.getByRole('alert')).toContainText('Choose a My data backup');
   await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(replacement)) });
   await expect(card.locator('.json-import-preview')).toContainText('2 time entries; 5 leave/adjustment entries; 1 POPs');
-  await expect(page.getByRole('button', { name: 'Import JSON', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Restore backup', exact: true })).toBeDisabled();
   await page.getByLabel('Replace all data in My data with this file.').check();
   state.failWrite = true;
-  await page.getByRole('button', { name: 'Import JSON', exact: true }).click();
+  await page.getByRole('button', { name: 'Restore backup', exact: true }).click();
   await expect(card.getByRole('alert')).toContainText('Simulated connection failure');
   await expect(card.locator('.json-import-preview')).toBeVisible();
   state.failWrite = false;
-  await page.getByRole('button', { name: 'Import JSON', exact: true }).click();
+  await page.getByRole('button', { name: 'Restore backup', exact: true }).click();
   await expect(card.getByRole('status')).toContainText('Replaced this workspace with 2 time entries');
   expect(state.logs.find(log => log.date === '2026-10-01')!.total_hours).toBe(1);
   expect(state.logs.some(log => log.date === '2026-10-02')).toBe(false);
@@ -103,29 +111,35 @@ test('exports all saved inputs and requires confirmation before replacing every 
   await expect(page.locator('.calendar-logged')).toHaveCount(2);
 });
 
-test('sample JSON import and export work offline with zero Supabase requests', async ({ page }) => {
+test('sample Settings hides data transfer and connection controls and saves locally offline', async ({ page }) => {
   const state = await backend(page);
   await page.goto('/?sample=2026&view=settings');
-  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeEnabled();
+  await expect(page.locator('.settings-view > section').first()).toHaveClass(/data-source-settings/);
+  await expect(page.locator('.data-source-settings')).toContainText('this browser’s sample workspace');
+  await expect(page.locator('.data-transfer-settings, .supabase-settings, .project-settings')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Import|Export|Download/ })).toHaveCount(0);
+  await expect(page.locator('input[type=file]')).toHaveCount(0);
   await page.context().setOffline(true);
-  await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'sample.json', mimeType: 'application/json', buffer: Buffer.from('[{"date":"2026-10-22","totalHours":4.1}]') });
-  await expect(page.getByText('This older file is incomplete.', { exact: false })).toBeVisible();
-  await page.getByLabel('Replace all data in 2026 sample data with this file.').check();
-  await page.getByRole('button', { name: 'Import JSON', exact: true }).click();
-  await expect(page.locator('.data-transfer-settings').getByRole('status')).toContainText('Replaced this workspace with 1 time entries');
-  const downloading = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
-  const download = await downloading;
-  const backup = JSON.parse(await readFile((await download.path())!, 'utf8'));
-  expect(backup.dataset).toBe('sample2026');
-  expect(backup.logs).toHaveLength(1);
-  expect(backup.periods).toHaveLength(24);
+  await page.locator('input[name=openingPto]').fill('42.25');
+  await page.getByRole('button', { name: 'Save leave settings' }).click();
+  await expect(page.locator('.leave-policy [role=status]')).toContainText('saved to this browser’s sample workspace');
+  await page.context().setOffline(false);
+  await page.reload();
+  await expect(page.locator('input[name=openingPto]')).toHaveValue('42.25');
+  await page.locator('.pop-management > summary').click();
+  await page.getByRole('button', { name: 'Edit POP Q', exact: true }).click();
+  await page.getByLabel('POP name', { exact: true }).fill('Discard on reset');
+  await page.getByRole('button', { name: 'Reset sample data' }).click();
+  await expect(page.locator('input[name=openingPto]')).toHaveValue('0');
+  await expect(page.locator('.pop-editor')).toHaveCount(0);
+  expect(state.report.settings.openingPto).toBe(0);
   expect(state.requests).toHaveLength(0);
 });
 
 test('POP names, dates and funding persist, update summaries, and stay isolated from sample data', async ({ page }) => {
   const state = await backend(page);
   await page.goto('/?view=settings');
+  await page.locator('.pop-management > summary').click();
   await page.getByRole('button', { name: 'Edit POP Q', exact: true }).click();
   const editor = page.getByRole('form', { name: 'Edit POP' });
   await editor.getByLabel('POP name').fill('Custom Q');
@@ -139,12 +153,14 @@ test('POP names, dates and funding persist, update summaries, and stay isolated 
   await page.getByRole('button', { name: 'Save POP', exact: true }).click();
   await expect(page.locator('.pop-settings').getByRole('status')).toContainText('POP definitions saved');
   await page.reload();
+  await page.locator('.pop-management > summary').click();
   await expect(page.getByRole('button', { name: 'Edit Custom Q', exact: true })).toBeVisible();
   await nav(page, 'POP');
   await expect(page.locator('[data-pop=pop-q]')).toContainText('Custom Q');
   await expect(page.locator('[data-pop=pop-q]')).toContainText('800');
   await nav(page, 'Settings');
   await page.locator('input[value=sample2026]').check();
+  await page.locator('.pop-management > summary').click();
   await expect(page.getByRole('button', { name: 'Edit POP Q', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Edit Custom Q', exact: true })).toHaveCount(0);
 });
@@ -675,10 +691,93 @@ test('legacy personal browser records are not offered for import or read into th
   const legacy = JSON.stringify([{ id: 'legacy', date: '2025-01-01', totalHours: 9 }]);
   await page.addInitScript(value => localStorage.setItem('work_hours_tracker_time_logs', value), legacy);
   await page.goto('/?view=settings');
-  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Export backup', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Import existing browser data' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Export browser data JSON' })).toHaveCount(0);
   expect(state.requests.some(request => request.path.includes('import_browser'))).toBe(false);
   expect(state.logs).toHaveLength(1);
   expect(await page.evaluate(() => localStorage.getItem('work_hours_tracker_time_logs'))).toBe(legacy);
+});
+
+for (const width of [390, 1280]) test(`personal Settings explains scope and keeps advanced editors collapsed at ${width}px`, async ({ page }) => {
+  await backend(page);
+  await page.setViewportSize({ width, height: 900 });
+  await page.goto('/?view=settings');
+  await expect(page.locator('.source-context')).toContainText('Ready');
+  await expect(page.locator('.source-context')).toContainText('test@example.invalid');
+  await expect(page.locator('.source-context')).toContainText('yiqquogdutgujsacoezh.supabase.co');
+  await expect(page.locator('.settings-view > section h3')).toHaveText(['Data source', 'Account & connection', 'Leave & forecasts', 'Periods of performance', 'Backup & restore', 'Advanced project setup']);
+  for (const selector of ['.pop-management', '.restore-settings', '.supabase-setup']) {
+    await expect(page.locator(selector)).not.toHaveAttribute('open', '');
+  }
+  await page.locator('.restore-settings > summary').click();
+  await expect(page.locator('.restore-settings')).toContainText('Destination: test@example.invalid · yiqquogdutgujsacoezh.supabase.co');
+  await page.locator('.pop-management > summary').click();
+  await page.getByText('Advanced project setup', { exact: true }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `work/personal-settings-${width}.png`, fullPage: true });
+});
+
+test('loading and failed account data never expose default settings and retry recovers', async ({ page }) => {
+  const state = await backend(page);
+  state.failRead = true;
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route(`${HOST}/rest/**`, async route => { await gate; await route.fallback(); });
+  await page.goto('/?view=settings');
+  await expect(page.locator('.source-context')).toContainText('Loading your timesheet');
+  await expect(page.locator('.leave-policy, .pop-settings, .data-transfer-settings')).toHaveCount(0);
+  release();
+  await expect(page.locator('.data-source-settings [role=alert]')).toContainText('Simulated connection failure');
+  await expect(page.locator('.leave-policy, .pop-settings, .data-transfer-settings')).toHaveCount(0);
+  state.failRead = false;
+  await page.getByRole('button', { name: 'Retry loading data' }).click();
+  await expect(page.locator('.source-context')).toContainText('Ready');
+  await expect(page.locator('input[name=openingPto]')).toHaveValue('0');
+});
+
+test('source changes clear leave and POP drafts, restore files, and replacement confirmation', async ({ page }) => {
+  await backend(page);
+  await page.goto('/?view=settings');
+  await page.locator('input[name=openingPto]').fill('999');
+  await page.locator('.pop-management > summary').click();
+  await page.getByRole('button', { name: 'Edit POP Q', exact: true }).click();
+  await page.getByLabel('POP name', { exact: true }).fill('Unsaved draft');
+  await page.locator('.restore-settings > summary').click();
+  await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'restore.json', mimeType: 'application/json', buffer: Buffer.from('[]') });
+  await page.getByLabel('Replace all data in My data with this file.').check();
+  await page.locator('input[value=sample2026]').check();
+  await expect(page.locator('input[name=openingPto]')).toHaveValue('0');
+  await expect(page.locator('.pop-editor, .data-transfer-settings')).toHaveCount(0);
+  await page.locator('input[value=personal]').check();
+  await expect(page.locator('input[name=openingPto]')).toHaveValue('0');
+  await expect(page.locator('.pop-editor, .json-import-preview')).toHaveCount(0);
+  await page.locator('.restore-settings > summary').click();
+  await expect(page.getByLabel('Replace all data in My data with this file.')).not.toBeChecked();
+  await expect(page.getByLabel('JSON file', { exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Restore backup', exact: true })).toBeDisabled();
+});
+
+test('sign-out and project changes remove account editors and pending restore state', async ({ page }) => {
+  await backend(page);
+  await page.goto('/?view=settings');
+  await page.locator('.restore-settings > summary').click();
+  await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'restore.json', mimeType: 'application/json', buffer: Buffer.from('[]') });
+  await page.getByLabel('Replace all data in My data with this file.').check();
+  await page.getByText('Advanced project setup', { exact: true }).click();
+  await page.getByLabel('Project URL', { exact: true }).fill('https://other-project.supabase.co');
+  await page.getByRole('button', { name: 'Save project connection', exact: true }).click();
+  await expect(page.locator('.source-context')).toContainText('other-project.supabase.co');
+  await expect(page.locator('.data-transfer-settings, .leave-policy, .pop-settings')).toHaveCount(0);
+  // Return to the original project, whose isolated session is still available.
+  await page.getByText('Advanced project setup', { exact: true }).click();
+  await page.getByLabel('Project URL', { exact: true }).fill(HOST);
+  await page.getByRole('button', { name: 'Save project connection', exact: true }).click();
+  await expect(page.locator('.source-context')).toContainText('Ready');
+  await page.locator('.restore-settings > summary').click();
+  await expect(page.getByLabel('JSON file', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('Replace all data in My data with this file.')).not.toBeChecked();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page.locator('.data-transfer-settings, .leave-policy, .pop-settings')).toHaveCount(0);
+  await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
 });
