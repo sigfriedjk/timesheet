@@ -1033,7 +1033,7 @@ button:disabled { cursor: wait; }
 .data-transfer-settings input[type="file"] { box-sizing: border-box; max-width: 100%; }
 .json-import-preview { overflow-wrap: anywhere; }
 .pop-editor { margin-top: 1rem; }
-.pop-settings > .sample-actions { margin-top: 1rem; }
+.pop-management > .sample-actions { margin-top: 1rem; }
 .restore-confirmation { display: flex; align-items: flex-start; gap: .65rem; margin: 1rem 0; }
 .setup-steps { padding-left: 1.5rem; line-height: 1.6; }
 .setup-steps code { overflow-wrap: anywhere; }
@@ -1075,3 +1075,22 @@ button:disabled { cursor: wait; }
 
 .monthly-table thead .month-column .as-of-control { margin-top: 0.5rem; }
 .monthly-table thead .month-column select { max-width: 100%; }
+
+/* Settings follow the selected data source before exposing workspace actions. */
+.settings-view > section { margin-bottom: 1.5rem; }
+.data-source-settings .dataset-selector { padding: 0; gap: 1rem; }
+.data-source-settings .dataset-option { align-items: flex-start; flex: 1 1 260px; padding: 1rem; border: 1px solid var(--border-subtle); border-radius: 8px; }
+.data-source-settings .dataset-option:has(input:checked) { border-color: var(--primary); background: rgba(59, 130, 246, .08); }
+.data-source-settings .dataset-option input { margin-top: .2rem; }
+.dataset-option small { display: block; color: var(--text-muted); margin-top: .4rem; line-height: 1.5; }
+.source-context { display: flex; flex-wrap: wrap; gap: .75rem 2rem; margin: 0; }
+.source-context div { min-width: 0; }
+.source-context dt { color: var(--text-muted); font-size: .8rem; margin-bottom: .25rem; }
+.source-context dd { margin: 0; overflow-wrap: anywhere; }
+.settings-disclosure { margin-top: 1rem; }
+.settings-disclosure > summary { cursor: pointer; font-weight: 600; padding: .5rem 0; }
+.settings-disclosure > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; }
+.settings-disclosure > summary .card-title { display: inline; }
+.project-settings .settings-disclosure { margin-top: 0; }
+.settings-subheading { margin: 1.25rem 0 .75rem; font-size: .95rem; }
+.restore-settings .settings-description, .project-settings .settings-description { overflow-wrap: anywhere; }

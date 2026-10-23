@@ -59,11 +59,11 @@ Run all SQL files in `supabase/migrations/` in filename order in the Supabase SQ
 
 Public defaults are in `src/config/supabasePublic.ts`; override them with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (or `VITE_SUPABASE_ANON_KEY`), or Settings. Privileged credentials must stay in the execution environment. Never place a secret/service-role key, Management API token, or database password in `VITE_*`, source, browser storage, screenshots, or logs. Vite rejects recognized privileged browser configuration before bundling.
 
-Personal data comes from Supabase; sample data stays in its separate local workspace. Use a JSON file in Settings to import data. Legacy personal browser records are left untouched and are not read or imported by the app. Cloud write failures remain visible in the editor; they never fall back to local personal storage. Account, project, and source changes clear previous data and drafts.
+Personal data comes from Supabase; sample data stays in its separate local workspace. Use **Settings → Backup & restore → Restore from JSON…** to restore a personal JSON backup. Legacy personal browser records are left untouched and are not read or imported by the app. Cloud write failures remain visible in the editor; they never fall back to local personal storage. Account, project, and source changes clear previous data and drafts.
 
-**Settings → Import & export JSON** exports a version 2 backup of every saved input: daily date/hours/notes, POP names/dates/funding, dated PTO/Holiday/Birthday/Overhead/PTO-adjustment entries and notes, opening balances/month, work-rate percentage and manual monthly projections. Monthly balances, accruals, and totals are recalculated, and birthday credit is fixed to January. Calculator helper inputs, credentials, and sessions are excluded.
+**Settings → Backup & restore → Export backup** exports a version 2 backup of every saved input: daily date/hours/notes, POP names/dates/funding, dated PTO/Holiday/Birthday/Overhead/PTO-adjustment entries and notes, opening balances/month, work-rate percentage and manual monthly projections. Monthly balances, accruals, and totals are recalculated, and birthday credit is fixed to January. Calculator helper inputs, credentials, and sessions are excluded.
 
-JSON import **replaces all data in the selected workspace**. Choose a file, review its section counts, check the explicit replacement confirmation, then click **Import JSON**. Personal replacement uses one owner-scoped database transaction; any failure rolls back all sections. Sample replacement writes one complete local snapshot and never touches Supabase. Version 1 backups and older log arrays remain accepted, with a warning that omitted report/settings and POP data reset to defaults. A version 2 file must include all sections, including explicit empty lists. Exported backups identify the workspace to prevent accidental sample/personal mixing. Export a backup first to keep current data.
+Restoring JSON **replaces all data in your signed-in account**. Choose a file, review its section counts, check the explicit replacement confirmation, then click **Restore backup**. Personal replacement uses one owner-scoped database transaction; any failure rolls back all sections. Sample replacement remains supported by the storage layer; the Settings UI exposes backup and restore only for personal data. Version 1 backups and older log arrays remain accepted, with a warning that omitted report/settings and POP data reset to defaults. A version 2 file must include all sections, including explicit empty lists. Exported backups identify the workspace to prevent accidental sample/personal mixing. Export a backup first to keep current data.
 
 Verification:
 
@@ -77,11 +77,11 @@ See `SUPABASE_HANDOFF.md` for current deployment readiness. Local mocked/embedde
 
 ## 2026 Sample Data
 
-Open [the sample calendar](https://sigfriedjk.github.io/timesheet/?sample=2026) or select **2026 sample data** under **Settings → Data source**. Sample entries use a separate browser storage key; editing, deleting, or resetting them does not change personal logs. The selected workspace persists across reloads. Select **My data** in Settings to return to personal logs.
+Open [the sample calendar](https://sigfriedjk.github.io/timesheet/?sample=2026) or select **2026 sample data · This browser** under **Settings → Data source**. Sample entries use a separate browser storage key; editing, deleting, or resetting them does not change personal logs. The selected workspace persists across reloads. Select **My data** in Settings to return to personal logs.
 
 The deterministic sample covers January 1 through October 20, 2026 with 149 logged days and 1,210.7 hours. February and August are empty; July 13–17 is a week off. It includes scattered days off, worked and unworked holidays, a Saturday shift, and daily hours from 6.0 to 10.0. Populated full months test just-below, exact, and just-above rounded 94% targets; October is partial. Unlogged dates indicate absent entries, not explicit leave records.
 
-In Settings, expand **2026 sample data coverage & downloads** to download the original sample as CSV or JSON. Monthly and POP summaries use these same logs.
+Settings starts with the active data source and its scope. Sample mode shows reset, coverage information, and editable leave/forecast and POP settings; import/export, account controls, and project setup are hidden. Personal mode shows account and project status, then loaded report settings, a collapsed POP editor, Backup & restore, and collapsed Advanced project setup. Signed-out, loading, and failed-load states explain why workspace editors are unavailable. Monthly and POP summaries use the selected workspace’s logs.
 
 ---
 

@@ -78,6 +78,7 @@ export async function verifyLiveBrowser({ site, sessions, fetch }) {
     await page.getByRole('button', { name: 'Save leave settings' }).click();
     await wait(() => document.querySelector('.leave-policy [role=status]')?.textContent.includes('saved'));
     stage = 'editing persisted POP definitions';
+    await page.locator('.pop-management > summary').click();
     await page.getByRole('button', { name: 'Edit Verification POP', exact: true }).click();
     const popEditor = page.getByRole('form', { name: 'Edit POP' });
     await popEditor.getByLabel('POP name').fill('Edited live POP');
@@ -86,6 +87,7 @@ export async function verifyLiveBrowser({ site, sessions, fetch }) {
     await wait(() => document.querySelector('.pop-settings [role=status]')?.textContent.includes('POP definitions saved'));
     await page.reload();
     await nav('Settings');
+    await page.locator('.pop-management > summary').click();
     await page.getByRole('button', { name: 'Edit Edited live POP', exact: true }).waitFor();
     stage = 'checking removed browser migration controls';
     assert.equal(await page.getByRole('button', { name: 'Import existing browser data' }).count(), 0);
@@ -94,15 +96,16 @@ export async function verifyLiveBrowser({ site, sessions, fetch }) {
       report: { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 999, openingHoliday: 25, openingBirthday: 3, workPercent: 90, autoPto: false },
         entries: ['pto', 'holiday', 'birthday', 'overhead', 'adjustment'].map((category, i) => ({ id: category, date: '2026-10-05', category, hours: i === 4 ? -1.25 : i + 1, notes: `Restored ${category}` })), projectedWork: { '2026-11': 120 } },
       periods: [{ id: 'restored', name: 'Restored POP', startDate: '2026-01-01', endDate: '2026-12-31', targetHours: 1900 }] });
+    await page.locator('.restore-settings > summary').click();
     await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'live-backup.json', mimeType: 'application/json', buffer: Buffer.from(json) });
     await wait(() => !!document.querySelector('.json-import-preview'));
-    assert.equal(await page.getByRole('button', { name: 'Import JSON', exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Restore backup', exact: true }).isDisabled(), true);
     await page.getByLabel('Replace all data in My data with this file.').check();
-    await page.getByRole('button', { name: 'Import JSON', exact: true }).click();
+    await page.getByRole('button', { name: 'Restore backup', exact: true }).click();
     await wait(() => document.querySelector('.data-transfer-settings [role=status]')?.textContent.includes('Replaced this workspace with 2 time entries'));
     stage = 'exporting a real cloud JSON backup';
     const downloading = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
+    await page.getByRole('button', { name: 'Export backup', exact: true }).click();
     const download = await downloading;
     const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
     assert.equal(exported.logs.length, 2);
