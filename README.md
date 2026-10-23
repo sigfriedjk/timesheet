@@ -127,18 +127,45 @@ Outputs static production assets to `./dist/`, ready for direct deployment to Gi
     ├── main.tsx             # React DOM entrypoint
     ├── components/
     │   ├── DailyCalculator.tsx  # Interface 1: Daily calculator & target projections
-    │   ├── CalendarView.tsx     # Interface 2: Calendar & historical log table
+    │   ├── CalendarView.tsx     # Calendar navigation, filters, and entry selection
+    │   ├── calendar/           # Month grid, day editor, autofill, saved entries table
+    │   ├── MonthlySummaryView.tsx # Monthly table, filters, and editor selection
+    │   ├── monthly/            # Monthly cards and leave editor
+    │   ├── SettingsView.tsx     # Settings ordering and sample reset coordination
+    │   ├── settings/           # Data source status and advanced project setup
+    │   ├── SupabaseAccount.tsx # Sign-in, access gate, and account controls
     │   ├── Navigation.tsx       # Header tab navigation
     │   └── PopSummaryView.tsx   # Funded versus worked hours by POP
+    ├── hooks/
+    │   ├── useWorkspace.ts     # Load/save lifecycle and workspace isolation
+    │   ├── useSupabaseConnection.ts # Project configuration and Auth lifecycle
+    │   └── useTodayDate.ts     # Local date refreshed at midnight and on focus
     ├── services/
-    │   ├── storage.ts       # Local-first persistence repository (with overwrite logic)
-    │   └── storage.test.ts  # Persistence & overwrite unit tests
+    │   ├── storage.ts          # Local sample persistence and source preference
+    │   ├── supabaseRepository.ts # User-scoped personal-data requests
+    │   ├── monthlyReport.ts    # Shared report defaults and load normalization
+    │   └── jsonBackup.ts       # Strict backup validation and serialization
     ├── types/
     │   └── index.ts         # Domain entities (TimeLog, POP, LeaveAdjustment)
     └── utils/
-        ├── calculations.ts      # Core mathematical formulas & 0.1 rounding rules
-        └── calculations.test.ts # Vitest suite for calculations & precision
+        ├── calculations.ts      # Core formulas and precision rules
+        ├── monthlyInputs.ts     # Group dated inputs and total recorded/planned usage
+        ├── monthlySummary.ts    # Accruals, balances, rolling windows, report totals
+        ├── popSummary.ts        # POP table calculations and cards from those rows
+        └── download.ts          # Browser file download and temporary URL cleanup
 ```
+
+Unit tests live beside the modules they exercise; browser workflows live in `tests/browser/` and database tests in `supabase/`.
+
+### Working with the code
+
+Views coordinate navigation and select records. The calendar and monthly child components own their form drafts, validation messages, and pending states; persistence is passed in through callbacks. This keeps a change to the day editor or monthly leave form local to that component without changing report calculations.
+
+Report calculations are pure functions. Monthly inputs are grouped once before building rows, and recorded/planned work and leave are summed separately. Preserve the rounding order: recorded work rounds before adding future work; recorded and planned leave each round before being combined. POP cards reuse the calculated table rows so funding and work totals share the same calculation.
+
+Use `services/monthlyReport.ts` for report defaults and normalization when loading saved data. Backup imports deliberately use stricter validation in `jsonBackup.ts`; do not replace that validation with the tolerant loader. Legacy report fields remain part of backup compatibility even though they do not affect forecasts.
+
+`useWorkspace` owns readiness, operation serialization, and protection against stale results after changing accounts or data sources. Keep those guards in the hook and user-scoped requests in `supabaseRepository.ts`. A failed personal-data operation must not fall back to local sample storage. Form save callbacks reject on failure so editors retain their drafts and show the error.
 
 ---
 
@@ -159,7 +186,7 @@ Outputs static production assets to `./dist/`, ready for direct deployment to Gi
 
 ## Monthly Summary Workflow
 
-Open the Monthly Summary tab or use `?view=monthly` (`?sample=2026&view=monthly` for the sample workspace). Monthly and POP summaries automatically use the current local date for actual work and leave, including in sample mode. Open reports refresh at midnight and when returning to the tab. All Years is the default period; use the year selector to narrow the view. Each row includes its month and year. The current month is highlighted in amber and future months in blue. The range starts at the earliest opening month, log, leave entry, or work override and extends through the end of the latest saved/current year, including empty months. The two cards stay anchored to today: prior month-end PTO/holiday/birthday balances on the left and the current month’s entered forecast totals on the right. Jump to today selects the current year and scrolls to its current month. The year filter in the Month header changes only the table. Both summary tables display every row and use page scrolling vertically.
+Open the Monthly Summary tab or use `?view=monthly` (`?sample=2026&view=monthly` for the sample workspace). Monthly and POP summaries automatically use the current local date for actual work and leave, including in sample mode. Open reports refresh at midnight and when returning to the tab. All Years is the default period; use the year selector to narrow the view. Each row includes its month and year. The current month is highlighted in amber and future months use gray shading. The range starts at the earliest opening month, log, leave entry, or work override and extends through the end of the latest saved/current year, including empty months. The two cards stay anchored to today: prior month-end PTO/holiday/birthday balances on the left and the current month’s entered forecast totals on the right. Jump to today selects the current year and scrolls to its current month. The year filter in the Month header changes only the table. Both summary tables display every row and use page scrolling vertically.
 
 Opening balances default to zero at January of the current year (January 2026 for the sample). Enter the correct starting PTO, holiday, and birthday balances in Settings. Balances carry across years; the report shows unavailable balances before the configured opening month.
 
@@ -169,7 +196,7 @@ US federal credits are counted on observed weekdays to avoid double credit for a
 
 ## POP Summary
 
-Open `?view=pop` or `?sample=2026&view=pop`. Fixed POP definitions live in `src/config/periodsOfPerformance.ts` and appear in **Settings → Periods of performance**. The 24 periods span April 25, 2024 through June 30, 2027, including mid-month and cross-year boundaries. Names are generic POP A–X; original aliases and the workbook's worked-hour amounts are not imported. Dates and funded amounts are hardcoded for now; editing periods in the interface is deferred.
+Open `?view=pop` or `?sample=2026&view=pop`. Default POP definitions live in `src/config/periodsOfPerformance.ts` and can be edited in **Settings → Periods of performance**. The 24 defaults span April 25, 2024 through June 30, 2027, including mid-month and cross-year boundaries. Names are generic POP A–X; original aliases and the workbook's worked-hour amounts are not imported. Edited names, dates, and funded amounts belong to the selected workspace.
 
 All POPs are displayed with their full inclusive date ranges. Weekday hours include holidays, matching the reference: Monday–Friday days × 8. Funded percentage is funded hours divided by weekday hours; table totals use a weighted percentage. Worked hours sum saved daily entries throughout each POP, including future forecasts and weekend/holiday work. Available is funded less worked, and can be negative.
 

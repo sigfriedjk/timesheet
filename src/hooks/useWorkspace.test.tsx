@@ -3,7 +3,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { useWorkspace } from './useWorkspace';
-import { createDefaultMonthlyReport } from '../utils/monthlySummary';
+import { createDefaultMonthlyReport } from '../services/monthlyReport';
 import { clearStorageForTesting, defaultPeriods, getAllTimeLogs, saveTimeLog } from '../services/storage';
 import { LogDataset } from '../services/storage';
 import { exportTimesheetJson } from '../services/jsonBackup';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { exportTimesheetJson, parseTimesheetJson } from './jsonBackup';
-import { createDefaultMonthlyReport } from '../utils/monthlySummary';
+import { createDefaultMonthlyReport } from '../services/monthlyReport';
 import { defaultPeriods } from './storage';
 
 const log = { id: 'a', date: '2026-10-01', totalHours: 8.1, notes: 'Worked', createdAt: '2026-10-01T12:00:00Z', updatedAt: '2026-10-01T12:00:00Z' };

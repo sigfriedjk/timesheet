@@ -3,7 +3,7 @@ import { ViewTab, TimeLog } from './types';
 import { getActiveLogDataset, setActiveLogDataset, LogDataset } from './services/storage';
 import { useSupabaseConnection } from './hooks/useSupabaseConnection';
 import { useWorkspace } from './hooks/useWorkspace';
-import { SupabaseAccess } from './components/SupabaseSettings';
+import { SupabaseAccess } from './components/SupabaseAccount';
 import { Navigation } from './components/Navigation';
 import { DailyCalculator } from './components/DailyCalculator';
 import { CalendarView } from './components/CalendarView';
@@ -21,21 +21,31 @@ interface ToastMessage {
 
 export const App: React.FC = () => {
   const [dataset, setDataset] = useState<LogDataset>(() =>
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('sample') === '2026'
-      ? 'sample2026' : getActiveLogDataset()
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('sample') === '2026'
+      ? 'sample2026'
+      : getActiveLogDataset(),
   );
   const connection = useSupabaseConnection(dataset === 'personal');
   const workspace = useWorkspace(dataset, connection.client, connection.session?.user.id);
   const { logs, report: reportState } = workspace;
   const viewIdentity = `${dataset}:${connection.config?.url}:${connection.session?.user.id ?? ''}`;
   const [currentTab, setCurrentTab] = useState<ViewTab>(() => {
-    const view = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('view') : null;
+    const view =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('view')
+        : null;
     return view && ['calculator', 'calendar', 'monthly', 'pop', 'settings'].includes(view)
-      ? view as ViewTab : dataset === 'sample2026' ? 'calendar' : 'calculator';
+      ? (view as ViewTab)
+      : dataset === 'sample2026'
+        ? 'calendar'
+        : 'calculator';
   });
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
-  useEffect(() => { setActiveLogDataset(dataset); }, [dataset]);
+  useEffect(() => {
+    setActiveLogDataset(dataset);
+  }, [dataset]);
 
   const showToast = (text: string, type: 'success' | 'info' | 'warning' = 'success') => {
     setToast({ id: Date.now().toString(), type, text });
@@ -45,9 +55,11 @@ export const App: React.FC = () => {
   };
 
   const handleLogSaved = async (logData: TimeLog) => {
-    const isOverwrite = logs.some(log => log.date === logData.date);
+    const isOverwrite = logs.some((log) => log.date === logData.date);
     const log = await workspace.saveLog(logData.date, logData.totalHours, logData.notes);
-    showToast(`${isOverwrite ? 'Updated' : 'Logged'} ${formatNumber(log.totalHours, 1)} hrs for ${log.date}`);
+    showToast(
+      `${isOverwrite ? 'Updated' : 'Logged'} ${formatNumber(log.totalHours, 1)} hrs for ${log.date}`,
+    );
     setCurrentTab('calendar');
   };
 
@@ -98,21 +110,16 @@ export const App: React.FC = () => {
       )}
 
       {/* Navigation Header */}
-      <Navigation
-        currentTab={currentTab}
-        onSelectTab={setCurrentTab}
-        loggedCount={logs.length}
-      />
+      <Navigation currentTab={currentTab} onSelectTab={setCurrentTab} loggedCount={logs.length} />
 
       {/* Main Content Area */}
       <main className="main-content">
         <div className="content-container" key={viewIdentity}>
-          {currentTab !== 'settings' && !workspace.ready && <SupabaseAccess connection={connection} workspace={workspace} />}
+          {currentTab !== 'settings' && !workspace.ready && (
+            <SupabaseAccess connection={connection} workspace={workspace} />
+          )}
           {workspace.ready && currentTab === 'calculator' && (
-            <DailyCalculator
-              onLogSaved={handleLogSaved}
-              existingLogs={logs}
-            />
+            <DailyCalculator onLogSaved={handleLogSaved} existingLogs={logs} />
           )}
 
           {workspace.ready && currentTab === 'calendar' && (
@@ -128,15 +135,26 @@ export const App: React.FC = () => {
             />
           )}
 
-          {workspace.ready && currentTab === 'monthly' && <MonthlySummaryView key={dataset} logs={logs} state={reportState} onChange={workspace.saveReport} />}
+          {workspace.ready && currentTab === 'monthly' && (
+            <MonthlySummaryView
+              key={dataset}
+              logs={logs}
+              state={reportState}
+              onChange={workspace.saveReport}
+            />
+          )}
 
-          {workspace.ready && currentTab === 'pop' && <PopSummaryView key={dataset} logs={logs} periods={workspace.periods} />}
+          {workspace.ready && currentTab === 'pop' && (
+            <PopSummaryView key={dataset} logs={logs} periods={workspace.periods} />
+          )}
 
           {currentTab === 'settings' && (
             <SettingsView
               isSample={dataset === 'sample2026'}
               leaveSettings={reportState.settings}
-              onSaveLeaveSettings={async settings => { await workspace.saveReport({ ...reportState, settings }); }}
+              onSaveLeaveSettings={async (settings) => {
+                await workspace.saveReport({ ...reportState, settings });
+              }}
               onUseSample={useSampleData}
               onUsePersonal={usePersonalData}
               onResetSample={workspace.resetSample}
@@ -146,7 +164,6 @@ export const App: React.FC = () => {
           )}
         </div>
       </main>
-
     </div>
   );
 };
