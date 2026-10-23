@@ -208,7 +208,7 @@ for (const width of [390, 1280]) test(`calculator aligns labels and normalizes r
   const state = await backend(page);
   await page.setViewportSize({ width, height: 1000 });
   await page.goto('/?view=calculator');
-  const shift = page.getByRole('region', { name: 'Today', exact: true });
+  const shift = page.getByRole('region', { name: 'Entry Creator', exact: true });
   const target = page.getByRole('region', { name: 'Out Target' });
   await expect(shift.getByLabel('Custom break minutes', { exact: true })).toHaveValue('0');
   await expect(shift.getByLabel('Time out', { exact: true })).toHaveAttribute('required', '');
@@ -282,7 +282,7 @@ test('day editor stays open on failure and closes after an acknowledged save; de
 test('Out Target switches its editable field, recalculates with breaks, and copies either direction', async ({ page }) => {
   await backend(page);
   await page.goto('/?view=calculator');
-  const today = page.getByRole('region', { name: 'Today', exact: true });
+  const today = page.getByRole('region', { name: 'Entry Creator', exact: true });
   const target = page.getByRole('region', { name: 'Out Target', exact: true });
   const hours = target.getByLabel('Target hours', { exact: true });
   const time = target.getByLabel('Target out time', { exact: true });

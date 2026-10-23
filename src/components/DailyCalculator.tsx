@@ -124,7 +124,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
         {/* Left Column: Form Controls */}
         <section className="calculator-card form-section" aria-labelledby="controls-heading">
           <h3 id="controls-heading" className="card-title">
-            Today
+            Entry Creator
           </h3>
 
           <form onSubmit={handleLogSubmit} className="calculator-form">
@@ -149,7 +149,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                   onClick={() => setDate(getTodayDateString())}
                   className={`btn-chip ${isToday ? 'chip-active' : ''}`}
                 >
-                  Today
+                  Entry Creator
                 </button>
               </div>
             </div>
