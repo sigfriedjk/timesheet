@@ -26,7 +26,7 @@ export const PopSummaryView: React.FC<Props> = ({ logs, periods }) => {
     <div className="monthly-table-scroll pop-table-scroll" tabIndex={0} aria-label="POP summary; scroll horizontally for all columns">
       <table className="monthly-table pop-table">
         <thead><tr><th scope="col" className="month-column">POP</th><th scope="col">Date range</th><th scope="col">Weekdays</th><th scope="col">Weekday hours</th><th scope="col">Funded hours</th><th scope="col">Funded %</th><th scope="col">Worked</th><th scope="col">Funded − worked</th></tr></thead>
-        <tbody>{report.rows.map(row => <tr key={row.id} data-pop={row.id} className={row.status === 'Active' ? 'active-pop' : ''}>
+        <tbody>{report.rows.map(row => <tr key={row.id} data-pop={row.id} aria-current={row.status === 'Active' ? 'date' : undefined} className={row.status === 'Active' ? 'active-pop current-month-row' : row.status === 'Upcoming' ? 'future-month-row' : ''}>
           <th scope="row" className="month-column"><span>{row.name}</span><small className="pop-status">{row.status}</small></th>
           <td className="pop-date-range"><time dateTime={row.startDate}>{row.startDate}</time><span> – </span><time dateTime={row.endDate}>{row.endDate}</time></td>
           <td>{row.weekdays}</td><td>{fixed(row.weekdayHours)}</td><td>{fixed(row.targetHours)}</td><td>{fixed(row.fundedPercent)}{row.fundedPercent != null && '%'}</td><td>{fixed(row.workedHours)}</td><td className={row.remainingHours < 0 ? 'negative-value' : ''}>{fixed(row.remainingHours)}</td>

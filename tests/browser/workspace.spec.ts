@@ -645,3 +645,26 @@ test('monthly cards stay tied to today while the table year changes', async ({ p
   await expect(cards).toHaveText(before!);
   await expect(page.getByText('Calculation details', { exact: true })).toHaveCount(0);
 });
+
+
+test('POP rows highlight active inclusive boundaries and upcoming periods', async ({ page }) => {
+  const state = await backend(page);
+  state.periods = [
+    { id: 'past', name: 'Past', startDate: '2026-09-01', endDate: '2026-10-21', targetHours: 100 },
+    { id: 'current', name: 'Current', startDate: '2026-10-22', endDate: '2026-10-23', targetHours: 16 },
+    { id: 'next', name: 'Next', startDate: '2026-10-24', endDate: '2026-11-30', targetHours: 100 },
+  ];
+  await page.goto('/?view=pop');
+  const current = page.locator('[data-pop=current]');
+  await expect(current).toHaveAttribute('aria-current', 'date');
+  await expect(current).toHaveClass(/current-month-row/);
+  await expect(page.locator('[data-pop=next]')).toHaveClass(/future-month-row/);
+  await expect(page.locator('[data-pop=past]')).not.toHaveClass(/current-month-row|future-month-row/);
+  await page.clock.setFixedTime(new Date('2026-10-23T12:00:00'));
+  await page.reload();
+  await expect(current).toHaveClass(/current-month-row/);
+  await page.clock.setFixedTime(new Date('2026-10-24T12:00:00'));
+  await page.reload();
+  await expect(current).not.toHaveClass(/current-month-row/);
+  await expect(page.locator('[data-pop=next]')).toHaveAttribute('aria-current', 'date');
+});

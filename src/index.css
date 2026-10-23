@@ -1007,8 +1007,8 @@ body {
 .pop-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
 .pop-status { display: block; font-size: 0.6rem; font-weight: 400; color: var(--text-muted); margin-top: 0.2rem; }
 .pop-table .month-column, .pop-settings-table .month-column { min-width: 85px; }
-.pop-table .active-pop td, .pop-table .active-pop th { background: #213953; }
-.pop-table .active-pop .pop-status { color: #93c5fd; }
+.pop-table .active-pop .month-column, .pop-table .active-pop .pop-status { color: #fde68a; }
+.pop-table .future-month-row .pop-status { color: #bfdbfe; font-weight: 600; }
 .pop-table .pop-date-range { text-align: left; }
 .pop-settings { margin-bottom: 1.5rem; }
 .pop-settings-scroll { max-height: 320px; margin-top: 0.75rem; }
