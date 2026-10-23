@@ -68,6 +68,25 @@ test('signed-out Settings leads with the source and gates workspace controls', a
   await expect(page.getByLabel('Project URL', { exact: true })).toBeVisible();
 });
 
+test('signed-out project setup downloads the complete SQL migrations in order', async ({ page }) => {
+  await backend(page, false);
+  await page.goto('/?view=settings');
+  await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+  await page.getByText('Advanced project setup', { exact: true }).click();
+
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download SQL setup', exact: true }).click();
+  const download = await downloading;
+
+  expect(download.suggestedFilename()).toBe('timesheet-supabase-setup.sql');
+  const [baseSql, workspaceSql, downloadedSql] = await Promise.all([
+    readFile('supabase/migrations/202610210001_timesheet.sql', 'utf8'),
+    readFile('supabase/migrations/202610220001_complete_workspace.sql', 'utf8'),
+    readFile((await download.path())!, 'utf8'),
+  ]);
+  expect(downloadedSql).toBe(`${baseSql}\n${workspaceSql}`);
+});
+
 test('exports all saved inputs and requires confirmation before replacing every section; failed restores can retry', async ({ page }) => {
   test.slow(); // Includes an intentional SDK write failure and retry, plus backup round-trip checks.
   const state = await backend(page);
