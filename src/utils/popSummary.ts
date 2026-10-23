@@ -25,3 +25,27 @@ export function buildPopSummary(logs: TimeLog[], periods: readonly PeriodOfPerfo
   const totals = { weekdays: total('weekdays'), weekdayHours: total('weekdayHours'), targetHours: total('targetHours'), workedHours: total('workedHours'), remainingHours: total('remainingHours') };
   return { rows, totals: { ...totals, fundedPercent: totals.weekdayHours ? totals.targetHours / totals.weekdayHours * 100 : null } };
 }
+
+export interface PopCard {
+  startDate: string;
+  endDate: string;
+  funded: number;
+  worked: number;
+  available: number;
+}
+
+/** POP-year totals are the sum of whole POPs from July 1 through June 30. */
+export function buildCurrentPopCards(logs: TimeLog[], periods: readonly PeriodOfPerformance[], asOf: string) {
+  const rows = buildPopSummary(logs, periods, asOf).rows;
+  const active = rows.find(period => period.status === 'Active');
+  const startYear = Number(asOf.slice(0, 4)) - (asOf.slice(5, 7) < '07' ? 1 : 0);
+  const startDate = `${startYear}-07-01`, endDate = `${startYear + 1}-06-30`;
+  const yearRows = rows.filter(period => period.startDate >= startDate && period.endDate <= endDate);
+  const funded = roundToTenth(yearRows.reduce((sum, row) => sum + row.targetHours, 0));
+  const worked = roundToTenth(yearRows.reduce((sum, row) => sum + row.workedHours, 0));
+  return {
+    year: { startDate, endDate, funded, worked, available: roundToTenth(funded - worked) },
+    current: active ? { name: active.name, startDate: active.startDate, endDate: active.endDate,
+      funded: active.targetHours, worked: active.workedHours, available: active.remainingHours } : null,
+  };
+}

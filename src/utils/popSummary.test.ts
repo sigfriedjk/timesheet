@@ -72,3 +72,18 @@ describe('POP summary', () => {
     expect(() => buildPopSummary([], [period('2026-03-09', '2026-03-07', 0)], '2026-03-31')).toThrow('Invalid range');
   });
 });
+
+it('sums complete July–June POPs for the year card and uses the active table row for the POP card', async () => {
+  const { buildCurrentPopCards } = await import('./popSummary');
+  const logs = [log('2026-06-30', 20), log('2026-07-01', 9), log('2026-10-23', 7), log('2026-11-02', 6), log('2027-06-30', 3), log('2027-07-01', 20)];
+  const before = JSON.stringify(logs);
+  const result = buildCurrentPopCards(logs, POP_PERIODS, '2026-10-23');
+  const yearPeriods = POP_PERIODS.filter(pop => pop.startDate >= '2026-07-01' && pop.endDate <= '2027-06-30');
+  const funded = yearPeriods.reduce((sum, pop) => sum + pop.targetHours, 0);
+  expect(result.current).toMatchObject({ name: 'POP Q', funded: 708, worked: 22, available: 686 });
+  expect(result.year).toEqual({ startDate: '2026-07-01', endDate: '2027-06-30', funded, worked: 25, available: funded - 25 });
+  expect(buildCurrentPopCards([], POP_PERIODS, '2027-06-30').year.startDate).toBe('2026-07-01');
+  expect(buildCurrentPopCards([], POP_PERIODS, '2026-07-01').year.startDate).toBe('2026-07-01');
+  expect(buildCurrentPopCards([], [], '2026-10-23').current).toBeNull();
+  expect(JSON.stringify(logs)).toBe(before);
+});

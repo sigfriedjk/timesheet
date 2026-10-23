@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { PeriodOfPerformance, TimeLog } from '../types';
-import { buildPopSummary } from '../utils/popSummary';
+import { buildPopSummary, buildCurrentPopCards, PopCard } from '../utils/popSummary';
 import { useTodayDate } from '../hooks/useTodayDate';
 import { formatNumber } from '../utils/format';
 
@@ -11,11 +11,12 @@ export const PopSummaryView: React.FC<Props> = ({ logs, periods }) => {
   const asOf = useTodayDate();
   const report = useMemo(() => buildPopSummary(logs, periods, asOf), [logs, periods, asOf]);
   const t = report.totals;
+  const cards = useMemo(() => buildCurrentPopCards(logs, periods, asOf), [logs, periods, asOf]);
   return <div className="pop-view">
-    <div className="pop-stats">
-      <div className="summary-stat"><span className="summary-label">Funded hours</span><strong data-stat="pop-funded">{fixed(t.targetHours)}</strong></div>
-      <div className="summary-stat"><span className="summary-label">Worked hours</span><strong data-stat="pop-worked">{fixed(t.workedHours)}</strong></div>
-      <div className="summary-stat"><span className="summary-label">Funded − worked</span><strong data-stat="pop-remaining" className={t.remainingHours < 0 ? 'negative-value' : ''}>{fixed(t.remainingHours)}</strong></div>
+    <div className="pop-stats pop-summary-cards">
+      <PopSummaryCard title="POP Year" period={`${cards.year.startDate} – ${cards.year.endDate}`} card={cards.year} name="year" />
+      {cards.current ? <PopSummaryCard title="POP" period={`${cards.current.name} · ${cards.current.startDate} – ${cards.current.endDate}`} card={cards.current} name="current" />
+        : <section className="summary-stat" aria-label="POP"><h3 className="summary-label">POP</h3><p>No POP includes today.</p></section>}
     </div>
     <div className="monthly-table-scroll pop-table-scroll" tabIndex={0} aria-label="POP summary; scroll horizontally for all columns">
       <table className="monthly-table pop-table">
@@ -30,3 +31,12 @@ export const PopSummaryView: React.FC<Props> = ({ logs, periods }) => {
     </div>
   </div>;
 };
+
+const PopSummaryCard: React.FC<{ title: string; period: string; card: PopCard; name: string }> = ({ title, period, card, name }) => <section className="summary-stat pop-summary-card" aria-label={title}>
+  <h3 className="summary-label">{title}</h3><span className="summary-period">{period}</span>
+  <dl className="current-month-breakdown pop-card-breakdown">
+    {([{ field: 'funded', label: 'Funded' }, { field: 'worked', label: 'Worked' }, { field: 'available', label: 'Funded − worked' }] as const).map(({ field, label }) => <div key={field}>
+      <dt>{label}</dt><dd data-stat={`pop-${name}-${field}`} className={card[field] < 0 ? 'negative-value' : ''}>{fixed(card[field])}<small> h</small></dd>
+    </div>)}
+  </dl>
+</section>;
