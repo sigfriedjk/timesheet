@@ -80,3 +80,18 @@ describe('Supabase repository through the real SDK', () => {
     expect((await repository.load()).periods).toEqual([]);
   });
 });
+
+it('autofills in one owner-scoped, conflict-protected statement and surfaces failures', async () => {
+  const { repository, requests } = setup(() => json([row('2026-11-02')]));
+  expect(await repository.fillWeekdays([])).toEqual([]);
+  expect(requests).toHaveLength(0);
+  expect(await repository.fillWeekdays(['2026-11-02', '2026-11-03'])).toHaveLength(1);
+  expect(requests).toHaveLength(1);
+  expect(JSON.parse(requests[0].init.body as string)).toEqual([
+    { user_id: 'user-a', date: '2026-11-02', total_hours: 8, notes: null },
+    { user_id: 'user-a', date: '2026-11-03', total_hours: 8, notes: null },
+  ]);
+  expect(new Headers(requests[0].init.headers).get('Prefer')).toContain('resolution=ignore-duplicates');
+  const failed = setup(() => json({ message: 'Offline' }, 403));
+  await expect(failed.repository.fillWeekdays(['2026-11-02'])).rejects.toThrow('Offline');
+});

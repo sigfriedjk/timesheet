@@ -123,6 +123,8 @@ export const App: React.FC = () => {
               onNavigateToCalculator={() => setCurrentTab('calculator')}
               onDeleteLog={handleDeleteLog}
               onSaveLog={handleCalendarSave}
+              onFillMonth={workspace.fillMonth}
+              busy={workspace.busy}
             />
           )}
 

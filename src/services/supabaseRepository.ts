@@ -42,6 +42,17 @@ export function createSupabaseRepository(client: SupabaseClient, userId: string)
       if (!data) throw new Error('The entry was not saved. Please retry.');
       return mapLog(data as LogRow);
     },
+    async fillWeekdays(dates: string[]) {
+      if (!dates.length) return [];
+      // One statement, with conflict protection for dates saved by another tab/device.
+      const { data, error } = await client.from('timesheet_logs').upsert(
+        dates.map(date => ({ user_id: userId, date, total_hours: 8, notes: null })),
+        { onConflict: 'user_id,date', ignoreDuplicates: true },
+      ).select();
+      check(error);
+      if (!data) throw new Error('Autofill was not acknowledged. Reload your timesheet before retrying.');
+      return (data as LogRow[]).map(mapLog);
+    },
     async deleteLog(date: string) {
       const { data, error } = await client.from('timesheet_logs').delete().eq('user_id', userId).eq('date', date).select('date');
       check(error);

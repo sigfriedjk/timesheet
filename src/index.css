@@ -1094,3 +1094,7 @@ button:disabled { cursor: wait; }
 .project-settings .settings-disclosure { margin-top: 0; }
 .settings-subheading { margin: 1.25rem 0 .75rem; font-size: .95rem; }
 .restore-settings .settings-description, .project-settings .settings-description { overflow-wrap: anywhere; }
+
+.calendar-autofill { margin-bottom: 1.25rem; }
+.calendar-autofill form { margin-top: .75rem; }
+.calendar-autofill input[type=month] { display: block; width: min(100%, 240px); margin-top: .5rem; }

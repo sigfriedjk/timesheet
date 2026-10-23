@@ -3,7 +3,8 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { MonthlyReportState, PeriodOfPerformance, WorkspaceData } from '../types';
 import { createDefaultMonthlyReport } from '../utils/monthlySummary';
 import { createSupabaseRepository } from '../services/supabaseRepository';
-import { defaultPeriods, deleteTimeLog, getMonthlyReportState, getSamplePeriods, initializeSampleLogs, LogDataset, replaceSampleWorkspace, saveMonthlyReportState, saveSamplePeriods, saveTimeLog } from '../services/storage';
+import { defaultPeriods, deleteTimeLog, generateId, getMonthlyReportState, getSamplePeriods, initializeSampleLogs, LogDataset, replaceSampleWorkspace, saveMonthlyReportState, saveSamplePeriods, saveTimeLog } from '../services/storage';
+import { emptyWeekdays } from '../utils/monthAutofill';
 import { parseTimesheetJson, validatePeriods } from '../services/jsonBackup';
 
 type Data = WorkspaceData;
@@ -76,6 +77,17 @@ export function useWorkspace(dataset: LogDataset, client: SupabaseClient | null,
       const log = repository ? await repository.saveLog(date, hours, notes) : saveTimeLog(date, hours, notes, 'sample2026').log;
       apply({ logs: [log, ...data.logs.filter(item => item.date !== date)].sort((a, b) => b.date.localeCompare(a.date)) });
       return log;
+    }),
+    fillMonth: (month: string) => operation(async data => {
+      const dates = emptyWeekdays(month, data.logs);
+      const now = new Date().toISOString();
+      const added = repository ? await repository.fillWeekdays(dates) : dates.map(date => ({
+        id: generateId(), date, totalHours: 8, createdAt: now, updatedAt: now,
+      }));
+      const logs = [...data.logs, ...added].sort((a, b) => b.date.localeCompare(a.date));
+      if (!repository && added.length) replaceSampleWorkspace({ ...data, logs });
+      apply({ logs });
+      return added.length;
     }),
     deleteLog: (date: string) => operation(async data => {
       if (repository) await repository.deleteLog(date); else deleteTimeLog(date, 'sample2026');

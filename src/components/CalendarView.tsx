@@ -4,6 +4,7 @@ import { Calendar as CalendarIcon, Trash2, Edit3, Plus, X } from 'lucide-react';
 import { MONTH_NAMES, WEEKDAY_NAMES, getFederalHolidays, getMonthCells, getMonthSummary } from '../utils/calendar';
 import { roundToTenth } from '../utils/calculations';
 import { formatNumber } from '../utils/format';
+import { emptyWeekdays } from '../utils/monthAutofill';
 import { useTodayDate } from '../hooks/useTodayDate';
 
 interface CalendarViewProps {
@@ -11,13 +12,21 @@ interface CalendarViewProps {
   isSample: boolean;
   onNavigateToCalculator: () => void;
   onDeleteLog: (date: string) => Promise<void>;
+  onFillMonth: (month: string) => Promise<number>;
+  busy: boolean;
   onSaveLog: (date: string, hours: number, notes: string) => Promise<void>;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
-  logs, isSample, onNavigateToCalculator, onDeleteLog, onSaveLog,
+  logs, isSample, onNavigateToCalculator, onDeleteLog, onSaveLog, onFillMonth, busy,
 }) => {
   const today = useTodayDate();
+  const [fillMonth, setFillMonth] = useState(today.slice(0, 7));
+  const [filling, setFilling] = useState(false);
+  const [fillStatus, setFillStatus] = useState('');
+  const [fillError, setFillError] = useState('');
+  let fillCount = 0;
+  try { fillCount = emptyWeekdays(fillMonth, logs).length; } catch { /* Native month validation also blocks submission. */ }
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const remove = async (date: string) => {
@@ -57,6 +66,29 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         <div className="kpi-card"><span className="kpi-label">Logged days</span><span className="kpi-value">{yearlyLogs.filter((log) => log.totalHours > 0).length}</span></div>
         <div className="kpi-card"><div className="kpi-heading"><span className="kpi-label">Logged hours</span><button type="button" className="btn-chip" onClick={jumpToToday}>Jump to today</button></div><span className="kpi-value">{formatNumber(totalYearHours, 1)}</span></div>
       </div>
+
+      <details className="calculator-card calendar-autofill settings-disclosure">
+        <summary>Autofill a month with 8-hour weekdays</summary>
+        <form onSubmit={async event => {
+          event.preventDefault();
+          if (filling || busy || deleting) return;
+          setFilling(true); setFillStatus(''); setFillError('');
+          try {
+            const count = await onFillMonth(fillMonth);
+            setSelectedYear(Number(fillMonth.slice(0, 4))); setSelectedMonth(fillMonth.slice(5, 7));
+            setFillStatus(`Added ${count} eight-hour entries for ${fillMonth}. Existing entries were kept.`);
+          } catch (error) { setFillError(error instanceof Error ? error.message : 'Could not autofill this month.'); }
+          finally { setFilling(false); }
+        }}>
+          <fieldset className="async-fields" disabled={filling || busy || deleting}>
+            <label className="form-label">Month to autofill<input className="form-input" type="month" min="1900-01" max="2100-12" required value={fillMonth} onChange={event => { setFillMonth(event.target.value); setFillStatus(''); setFillError(''); }} /></label>
+            <p className="settings-description">Adds 8 hours to empty Monday–Friday dates, including holidays. Existing hours, zero entries, and notes stay as entered. Future entries become your forecast; past entries count as recorded work.</p>
+            <button type="submit" className="btn-secondary" disabled={!fillCount}>{filling ? 'Saving…' : `Add ${fillCount} weekday entries`}</button>
+          </fieldset>
+          <p className="settings-status" role="status">{fillStatus}</p>
+          {fillError && <p className="form-error" role="alert">{fillError}</p>}
+        </form>
+      </details>
 
       <div className="calendar-legend" aria-label="Calendar legend">
         <span><i className="legend-dot logged-dot" />Logged hours</span>
