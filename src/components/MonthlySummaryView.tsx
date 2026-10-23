@@ -64,12 +64,6 @@ export const MonthlySummaryView: React.FC<Props> = ({ logs, state, onChange }) =
           <Cell value={report.yearEndBalance?.pto} /><Cell value={report.yearEndBalance?.holiday} /><Cell value={report.yearEndBalance?.birthday} /></tr></tfoot>
       </table>
     </div>
-    <details className="report-rules"><summary>Calculation details</summary>
-      <p>Weekday hours include holidays, as in the reference table. Holiday credits are counted once on their observed weekday and granted at the start of the month. Birthday credit is 8 hours in January. PTO accrues at 0.0851 per worked hour.</p>
-      <p>Remaining work uses {fixed(state.settings.workPercent)}% of 8 hours per non-holiday weekday, less planned leave. Future-dated daily logs replace the estimate for that day. Edit a month to change its entered leave totals and PTO adjustment.</p>
-      <p>Historical PTO gaps are {state.settings.autoPto ? 'automatically filled unless an explicit PTO entry exists' : 'not automatically deducted; only explicit PTO entries reduce the PTO balance'}. Unworked observed holidays default to holiday leave; an explicit holiday entry overrides that portion of the month. Forecasts estimate PTO needed to cover future weekday gaps after other leave.</p>
-      <p>Balances start at {state.settings.openingMonth}, carry across years, and may become negative. Earlier balances are unavailable. The 12-month total includes up to 12 tracked months and future estimates for projected rows.</p>
-    </details>
   </div>;
 };
 
