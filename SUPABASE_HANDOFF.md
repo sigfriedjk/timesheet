@@ -1,6 +1,10 @@
+# Current single-owner admission policy
+
+The project permits only its existing owner. New signups and anonymous sign-ins are disabled server-side; email sign-in stays enabled. `npm run lock:supabase` applies and independently reads back the policy. `npm run verify:admission` checks live signup rejection and existing-owner read-only sign-in/session refresh without creating accounts or sending email. The older disposable-user verifier now refuses signup-disabled projects. See [SINGLE_OWNER_ACCESS.md](SINGLE_OWNER_ACCESS.md) for current setup/recovery instructions. Historical references below to enabled signups or production disposable accounts are superseded.
+
 # Private workspace configuration status
 
-The additive private-configuration schema and confirmed account backfill have been applied and checked without changing existing POPs, logs, or other saved settings. The rate was inserted only where missing. Repeating the backfill made no changes. The application changes remain pending PR review; do not merge or deploy until authorized.
+The additive private-configuration schema and confirmed account backfill have been applied and checked without changing existing POPs, logs, or other saved settings. The rate was inserted only where missing. Repeating the backfill made no changes. PR #17 was merged and deployed with user authorization; this section describes that completed migration.
 
 See [PRIVATE_CONFIGURATION.md](PRIVATE_CONFIGURATION.md) for current rate units, backup compatibility, validation, and historical exposure. Older release notes below are historical and do not override the current storage and restore rules.
 
