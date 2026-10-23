@@ -5,9 +5,9 @@ import { defaultPeriods } from './storage';
 
 const log = { id: 'a', date: '2026-10-01', totalHours: 8.1, notes: 'Worked', createdAt: '2026-10-01T12:00:00Z', updatedAt: '2026-10-01T12:00:00Z' };
 describe('JSON timesheet backups', () => {
-  it('round trips entries, opt-outs, leave and forecasts without exporting account or session fields', () => {
+  it('round trips entries, leave and forecasts without exporting account or session fields', () => {
     const report = createDefaultMonthlyReport();
-    report.settings.autoPto = false;
+   
     report.settings.openingPto = -4.25;
     report.entries = [{ id: 'pto', date: '2026-10-05', category: 'pto', hours: 8, notes: 'Vacation' }];
     report.projectedWork = { '2026-11': 120.5 };
@@ -53,4 +53,15 @@ describe('JSON timesheet backups', () => {
     }
     expect(parseTimesheetJson(JSON.stringify({ logs: [], periods: [] })).periods).toEqual([]);
   });
+});
+
+
+it('ignores historical inference flags in old JSON without creating or modifying leave entries', () => {
+  const state = createDefaultMonthlyReport(2026);
+  Object.assign(state.settings, { autoPto: true });
+  const contents = JSON.stringify({ logs: [log], report: state });
+  const restored = parseTimesheetJson(contents).report!;
+  expect(restored.entries).toEqual([]);
+  expect(restored.settings).not.toHaveProperty('autoPto');
+  expect(exportTimesheetJson([log], state, 'personal')).not.toContain('autoPto');
 });

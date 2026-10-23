@@ -33,21 +33,35 @@ export const MonthlySummaryView: React.FC<Props> = ({ logs, state, onChange }) =
   const report = useMemo(() => buildMonthlySummary(logs, state, year === 'all' ? 'all' : Number(year), asOf), [logs, state, year, asOf]);
   const t = report.totals;
   const closing = report.rows[report.rows.length - 1];
+  const current = report.currentMonth;
+  const previous = report.previousMonth;
+  const monthLabel = (row: MonthlyRow) => `${MONTH_NAMES[row.month]} ${row.year}`;
   return <div className="monthly-view">
-    <div className="monthly-toolbar">
-      <label className="as-of-control">Months in<select className="form-input" aria-label="Monthly summary year" value={year} disabled={saving} onChange={event => { setYear(event.target.value); setEditing(null); }}><option value="all">All Years</option>{range.years.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
-      <button type="button" className="btn-secondary accrual-toggle" aria-expanded={showAccrued} aria-controls="monthly-summary-table" onClick={() => setShowAccrued(!showAccrued)}>{showAccrued ? <ChevronDown size={15} /> : <ChevronRight size={15} />}{showAccrued ? 'Hide accrued' : 'Show accrued'}</button>
-    </div>
     <div className="monthly-stats">
-      <div className="summary-stat"><span className="summary-label">{year === 'all' ? 'Logged hours' : 'Logged year hours'}</span><strong data-stat="year-hours">{fixed(t.actualHours, 1)}</strong></div>
-      <div className="summary-stat"><span className="summary-label">Leave balance</span><BalanceDetail value={report.currentBalance} /></div>
-      <div className="summary-stat"><span className="summary-label">{year === 'all' ? 'Forecast total' : 'Forecast year total'}</span><strong data-stat="forecast-year-hours">{fixed(t.workHours, 1)} <small>h</small></strong></div>
+      <section className="summary-stat" aria-label="End-of-month balance">
+        <h3 className="summary-label">End-of-month balance</h3><span className="summary-period">{monthLabel(previous)}</span>
+        <BalanceDetail value={previous.actualBalance} />
+      </section>
+      <section className="summary-stat" aria-label="Current month">
+        <h3 className="summary-label">Current month</h3><span className="summary-period">{monthLabel(current)}</span>
+        <dl className="current-month-breakdown">{[
+          { label: 'Weekday hours', value: current.weekdayHours, stat: 'month-weekday-hours' },
+          { label: 'Holidays', value: current.holidayCount, stat: 'month-holidays', count: true },
+          { label: 'Logged hours', value: current.actualHours, stat: 'month-logged-hours' },
+          { label: 'Work total', value: current.workHours, stat: 'month-work-hours' },
+          { label: '12-month total', value: current.rollingTotal, stat: 'month-rolling-hours' },
+          { label: 'Leave needed', value: current.leaveNeeded, stat: 'month-leave-needed' },
+        ].map(({ label, value, stat, count }) => <div key={stat}><dt>{label}</dt><dd data-stat={stat}>{fixed(value, count ? 0 : 1)}{!count && <small> h</small>}</dd></div>)}</dl>
+      </section>
+    </div>
+    <div className="monthly-toolbar">
+      <button type="button" className="btn-secondary accrual-toggle" aria-expanded={showAccrued} aria-controls="monthly-summary-table" onClick={() => setShowAccrued(!showAccrued)}>{showAccrued ? <ChevronDown size={15} /> : <ChevronRight size={15} />}{showAccrued ? 'Hide accrued' : 'Show accrued'}</button>
     </div>
     {editing && <MonthEditor key={editing} row={report.rows.find(row => row.key === editing)!} asOf={asOf} state={state} onChange={onChange} onClose={closeEditor} onSaving={setSaving} />}
     <div className="monthly-table-scroll" tabIndex={0} aria-label="Monthly work and leave summary; scroll horizontally for all columns">
       <table className="monthly-table" id="monthly-summary-table">
         <thead>
-          <tr><th rowSpan={2} className="month-column" scope="col">Month</th><th colSpan={6} scope="colgroup">Work & trailing 12 months</th>{showAccrued && <th colSpan={3} scope="colgroup" className="accrual-group">Accrued</th>}<th colSpan={4} scope="colgroup" className="usage-group">Used / planned leave</th><th rowSpan={2} scope="col">PTO adj.</th><th colSpan={3} scope="colgroup" className="balance-group">End-of-month balances</th></tr>
+          <tr><th rowSpan={2} className="month-column" scope="col"><span>Month</span><label className="as-of-control"><select className="form-input" aria-label="Monthly summary year" value={year} disabled={saving} onChange={event => { setYear(event.target.value); setEditing(null); }}><option value="all">All Years</option>{range.years.map(value => <option key={value} value={value}>{value}</option>)}</select></label></th><th colSpan={6} scope="colgroup">Work & trailing 12 months</th>{showAccrued && <th colSpan={3} scope="colgroup" className="accrual-group">Accrued</th>}<th colSpan={4} scope="colgroup" className="usage-group">Used / planned leave</th><th rowSpan={2} scope="col">PTO adj.</th><th colSpan={3} scope="colgroup" className="balance-group">End-of-month balances</th></tr>
           <tr>{['Weekday h', 'Holidays', 'Logged h', 'Work total', '12m total', 'Leave needed', ...(showAccrued ? ['PTO', 'Holiday', 'Birthday'] : []), 'PTO', 'Holiday', 'Birthday', 'Overhead', 'PTO', 'Holiday', 'Birthday'].map((heading, i) => <th key={i} scope="col">{heading}</th>)}</tr>
         </thead>
         <tbody>{report.rows.map(row => <tr key={row.key} data-month={row.key} aria-current={row.key === asOf.slice(0, 7) ? 'date' : undefined} className={`${row.projected ? 'projected-row ' : ''}${row.key === asOf.slice(0, 7) ? 'current-month-row' : row.key > asOf.slice(0, 7) ? 'future-month-row' : ''}`}>
@@ -64,12 +78,6 @@ export const MonthlySummaryView: React.FC<Props> = ({ logs, state, onChange }) =
           <Cell value={report.yearEndBalance?.pto} /><Cell value={report.yearEndBalance?.holiday} /><Cell value={report.yearEndBalance?.birthday} /></tr></tfoot>
       </table>
     </div>
-    <details className="report-rules"><summary>Calculation details</summary>
-      <p>Weekday hours include holidays, as in the reference table. Holiday credits are counted once on their observed weekday and granted at the start of the month. Birthday credit is 8 hours in January. PTO accrues at 0.0851 per worked hour.</p>
-      <p>Remaining work uses {fixed(state.settings.workPercent)}% of 8 hours per non-holiday weekday, less planned leave. Future-dated daily logs replace the estimate for that day. Edit a month to change its entered leave totals and PTO adjustment.</p>
-      <p>Historical PTO gaps are {state.settings.autoPto ? 'automatically filled unless an explicit PTO entry exists' : 'not automatically deducted; only explicit PTO entries reduce the PTO balance'}. Unworked observed holidays default to holiday leave; an explicit holiday entry overrides that portion of the month. Forecasts estimate PTO needed to cover future weekday gaps after other leave.</p>
-      <p>Balances start at {state.settings.openingMonth}, carry across years, and may become negative. Earlier balances are unavailable. The 12-month total includes up to 12 tracked months and future estimates for projected rows.</p>
-    </details>
   </div>;
 };
 
@@ -106,7 +114,7 @@ const MonthEditor: React.FC<{ row: MonthlyRow; asOf: string; state: MonthlyRepor
       <div className="month-totals-fields">
         {LEAVE_FIELDS.map(({ category, label }, index) => <label key={category}>{label}<input ref={index === 0 ? firstInput : undefined} className="form-input" type="number" min={category === 'adjustment' ? undefined : 0} step="0.01" placeholder="0" value={values[category]} onChange={event => setValues({ ...values, [category]: event.target.value })} /></label>)}
       </div>
-      <p id="month-editor-help" className="settings-description">Hours entered for this month, excluding automatic estimates. Blank clears the entered value; PTO and holiday then use automatic calculations. Enter 0 to explicitly record zero.</p>
+      <p id="month-editor-help" className="settings-description">Hours entered for this month. Blank clears the entered value; enter 0 to explicitly record zero. Past leave uses only entered values. Future forecasts remain estimates.</p>
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="sample-actions"><button type="submit" className="btn-primary">{busy ? 'Saving…' : 'Save month'}</button><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button></div>
     </fieldset>

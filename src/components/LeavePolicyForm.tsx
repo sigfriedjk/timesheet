@@ -17,7 +17,7 @@ export const LeavePolicyForm: React.FC<{ settings: LeaveSettings; onSave: (setti
       try {
       await onSave({ openingMonth: String(data.get('openingMonth')), openingPto: Number(data.get('openingPto')),
         openingHoliday: Number(data.get('openingHoliday')), openingBirthday: Number(data.get('openingBirthday')),
-        workPercent: Number(data.get('workPercent')), autoPto: data.has('autoPto') });
+        workPercent: Number(data.get('workPercent')) });
       setSaved(true);
       } catch (error) { setError(error instanceof Error ? error.message : 'Could not save settings.'); } finally { setBusy(false); }
     }} onChange={() => setSaved(false)}><fieldset className="async-fields" disabled={busy}>
@@ -29,8 +29,6 @@ export const LeavePolicyForm: React.FC<{ settings: LeaveSettings; onSave: (setti
         <label>Future work rate (%)<input className="form-input" type="number" name="workPercent" step="0.1" min="0" max="200" defaultValue={settings.workPercent} required /></label>
       </div>
       <p className="settings-description">Birthday leave is credited in January. Monthly balances are calculated from opening balances, accruals, leave used, and adjustments.</p>
-      <label className="checkbox-label"><input type="checkbox" name="autoPto" defaultChecked={settings.autoPto} />Auto-fill historical PTO gaps</label>
-      <p className="settings-description">Enabled by default: unlogged weekday hours become PTO after holiday, birthday, and overhead hours. Empty months also count as PTO. An explicit PTO entry overrides that month's automatic amount.</p>
       <p className="settings-description">Forecasts use the future work rate on remaining non-holiday weekdays. PTO accrues at 0.0851 per hour worked; holiday credits are added each month and 8 birthday hours in January. Opening balances and leave entries are saved with the selected data source.</p>
       <div className="sample-actions"><button type="submit" className="btn-primary">{busy ? 'Saving…' : 'Save leave settings'}</button><span role="status">{saved ? 'Leave and forecast settings saved.' : ''}</span></div>
       {error && <p className="form-error" role="alert">{error}</p>}

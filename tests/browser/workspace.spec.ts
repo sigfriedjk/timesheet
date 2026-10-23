@@ -5,7 +5,7 @@ import { MonthlyReportState } from '../../src/types';
 
 const HOST = 'https://yiqquogdutgujsacoezh.supabase.co';
 const A = '11111111-1111-4111-8111-111111111111';
-const report: MonthlyReportState = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100, autoPto: true }, entries: [], projectedWork: {} };
+const report: MonthlyReportState = { ptoPolicyVersion: 1, settings: { openingMonth: '2026-01', openingPto: 0, openingHoliday: 0, openingBirthday: 0, workPercent: 100 }, entries: [], projectedWork: {} };
 const entry = (date = '2026-10-01', hours = 8, notes = 'cloud entry') => ({ user_id: A, id: date, date, total_hours: hours, notes, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' });
 async function backend(page: Page, signedIn = true) {
   const state = { logs: [entry()], report, periods: POP_PERIODS.map(period => ({ ...period })), failRead: false, failWrite: false, delay: 0, requests: [] as { path: string; method: string; body: any }[] };
@@ -17,11 +17,6 @@ async function backend(page: Page, signedIn = true) {
     let data: unknown; let status = 200;
     if (path.includes('/auth/')) data = {};
     else if ((method === 'GET' && state.failRead) || (method !== 'GET' && state.failWrite)) { data = { message: 'Simulated connection failure', code: 'TEST' }; status = 500; }
-    else if (path.endsWith('/rpc/import_browser_timesheet')) {
-      const missing = body.p_logs.filter((log: { date: string }) => !state.logs.some(existing => existing.date === log.date));
-      state.logs.push(...missing.map((log: any) => entry(log.date, log.total_hours, log.notes)));
-      data = missing.length;
-    }
     else if (path.endsWith('/rpc/replace_timesheet_workspace')) {
       state.logs = body.p_logs.map((log: any) => entry(log.date, log.total_hours, log.notes));
       state.report = body.p_report; state.periods = body.p_periods;
@@ -52,14 +47,14 @@ async function backend(page: Page, signedIn = true) {
 const nav = (page: Page, name: string) => page.locator('.nav-tab-btn').filter({ hasText: name }).click();
 test.beforeEach(async ({ page }) => { await page.clock.install({ time: new Date('2026-10-22T12:00:00') }); });
 
-test('Settings exposes JSON controls while signed out and explains when old browser data is absent', async ({ page }) => {
+test('Settings exposes JSON controls while signed out without browser migration controls', async ({ page }) => {
   await backend(page, false);
   await page.goto('/?view=settings');
   await expect(page.getByRole('heading', { name: 'Import & export JSON' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Import JSON', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Import existing browser data' })).toBeVisible();
-  await expect(page.getByText('No previous personal records were found in this browser.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Import existing browser data' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Export browser data JSON' })).toHaveCount(0);
 });
 
 test('exports all saved inputs and requires confirmation before replacing every section; failed restores can retry', async ({ page }) => {
@@ -81,7 +76,7 @@ test('exports all saved inputs and requires confirmation before replacing every 
   await page.getByLabel('JSON file', { exact: true }).setInputFiles({ name: 'broken.json', mimeType: 'application/json', buffer: Buffer.from('[{"date":"2026-02-30","totalHours":8}]') });
   await expect(card.getByRole('alert')).toContainText('Invalid date');
   expect(state.requests.filter(request => request.path.includes('/rpc/'))).toHaveLength(0);
-  const restoredReport = { ...report, settings: { ...report.settings, openingPto: 123, openingHoliday: 45, openingBirthday: 6, autoPto: false, workPercent: 90 },
+  const restoredReport = { ...report, settings: { ...report.settings, openingPto: 123, openingHoliday: 45, openingBirthday: 6, workPercent: 90 },
     entries: ['pto', 'holiday', 'birthday', 'overhead', 'adjustment'].map((category, i) => ({ id: category, date: '2026-10-05', category, hours: i === 4 ? -1.25 : i + 1, notes: `Restore ${category}` })), projectedWork: { '2026-11': 120 } };
   const restoredPeriods = [{ ...POP_PERIODS[0], name: 'Restored POP', startDate: '2026-01-01', endDate: '2026-12-31', targetHours: 1800 }];
   const replacement = { format: 'timesheet', version: 2, dataset: 'personal', logs: [{ date: '2026-10-01', totalHours: 1 }, { date: '2026-10-22', totalHours: 4.1 }], report: restoredReport, periods: restoredPeriods };
@@ -168,7 +163,7 @@ test('sample calculator, calendar, monthly, POP and settings work offline withou
   await page.goto('/?sample=2026');
   await expect(page.locator('.calendar-logged')).toHaveCount(149);
   await nav(page, 'Monthly');
-  await expect(page.locator('[data-stat=year-hours]')).toHaveText('1210.7');
+  await expect(page.locator('[data-stat=month-logged-hours]')).toHaveText('97.8 h');
   await nav(page, 'POP');
   await expect(page.locator('[data-stat=pop-worked]')).toHaveText('1210.7');
   await nav(page, 'Calculator');
@@ -181,7 +176,7 @@ test('sample calculator, calendar, monthly, POP and settings work offline withou
   await expect(page.getByText('Sample data reset to the original 149 entries.')).toBeVisible();
   await page.context().setOffline(true);
   await nav(page, 'Monthly');
-  await expect(page.locator('[data-stat=year-hours]')).toHaveText('1210.7');
+  await expect(page.locator('[data-stat=month-logged-hours]')).toHaveText('97.8 h');
   expect(state.requests).toHaveLength(0);
 });
 
@@ -208,7 +203,7 @@ for (const width of [390, 1280]) test(`calculator aligns labels and normalizes r
   const state = await backend(page);
   await page.setViewportSize({ width, height: 1000 });
   await page.goto('/?view=calculator');
-  const shift = page.getByRole('region', { name: 'Today', exact: true });
+  const shift = page.getByRole('region', { name: 'Entry Creator', exact: true });
   const target = page.getByRole('region', { name: 'Out Target' });
   await expect(shift.getByLabel('Custom break minutes', { exact: true })).toHaveValue('0');
   await expect(shift.getByLabel('Time out', { exact: true })).toHaveAttribute('required', '');
@@ -282,7 +277,7 @@ test('day editor stays open on failure and closes after an acknowledged save; de
 test('Out Target switches its editable field, recalculates with breaks, and copies either direction', async ({ page }) => {
   await backend(page);
   await page.goto('/?view=calculator');
-  const today = page.getByRole('region', { name: 'Today', exact: true });
+  const today = page.getByRole('region', { name: 'Entry Creator', exact: true });
   const target = page.getByRole('region', { name: 'Out Target', exact: true });
   const hours = target.getByLabel('Target hours', { exact: true });
   const time = target.getByLabel('Target out time', { exact: true });
@@ -343,7 +338,7 @@ test('Calendar and POP numbers omit trailing decimal zeros in totals, cells, and
 for (const width of [390, 1280]) test(`summaries default to All Years and show every row with page scrolling at ${width}px`, async ({ page }) => {
   const state = await backend(page);
   state.logs = [entry('2025-01-02', 8), entry('2026-01-02', 9), entry('2027-09-01', 10)];
-  state.report = { ...report, settings: { ...report.settings, openingMonth: '2024-11', autoPto: false },
+  state.report = { ...report, settings: { ...report.settings, openingMonth: '2024-11' },
     entries: [{ id: 'january-2026', date: '2026-01-03', category: 'pto', hours: 3 }], projectedWork: { '2028-03': 100 } };
   await page.setViewportSize({ width, height: 900 });
   await page.goto('/?view=monthly');
@@ -352,7 +347,7 @@ for (const width of [390, 1280]) test(`summaries default to All Years and show e
   await expect(page.locator('.monthly-table tbody tr')).toHaveCount(50);
   await expect(page.locator('[data-month="2025-01"] th')).toContainText('Jan 2025');
   await expect(page.locator('[data-month="2026-01"] th')).toContainText('Jan 2026');
-  await expect(page.locator('[data-stat=year-hours]')).toHaveText('17');
+  await expect(page.locator('.monthly-table tfoot td').nth(2)).toHaveText('17');
   const current = page.locator('[data-month="2026-10"]');
   const future = page.locator('[data-month="2027-01"]');
   const previous = page.locator('[data-month="2025-10"]');
@@ -372,7 +367,7 @@ for (const width of [390, 1280]) test(`summaries default to All Years and show e
   await expect(page.locator('.monthly-table tbody tr')).toHaveCount(12);
   await expect(page.locator('[data-month="2026-01"]')).toHaveCount(0);
   await expect(page.locator('.current-month-row')).toHaveCount(0);
-  await expect(page.locator('[data-stat=year-hours]')).toHaveText('8');
+  await expect(page.locator('.monthly-table tfoot td').nth(2)).toHaveText('8');
   await page.getByRole('button', { name: 'Edit January 2025 leave', exact: true }).click();
   const editor = page.getByRole('form', { name: 'January 2025' });
   await editor.getByLabel('PTO entered', { exact: true }).fill('2');
@@ -452,7 +447,7 @@ test('monthly summary trims zeros, collapses accruals, and edits the five saved 
 test('summary cards use today automatically, refresh at midnight, and keep forecasts separate', async ({ page }) => {
   const state = await backend(page);
   state.logs = [entry('2026-10-21', 7), entry('2026-10-22', 8), entry('2026-10-23', 9)];
-  state.report = { ...report, settings: { ...report.settings, openingMonth: '2026-10', openingPto: 10, openingHoliday: 20, openingBirthday: 30, autoPto: false }, entries: [
+  state.report = { ...report, settings: { ...report.settings, openingMonth: '2026-10', openingPto: 10, openingHoliday: 20, openingBirthday: 30 }, entries: [
     { id: 'pto', date: '2026-10-22', category: 'pto', hours: 2 },
     { id: 'holiday', date: '2026-10-22', category: 'holiday', hours: 3 },
     { id: 'birthday', date: '2026-10-22', category: 'birthday', hours: 4 },
@@ -461,21 +456,20 @@ test('summary cards use today automatically, refresh at midnight, and keep forec
   ] };
   await page.clock.pauseAt(new Date('2026-10-22T23:59:59'));
   await page.goto('/?view=monthly');
-  await expect(page.locator('[data-stat=year-hours]')).toHaveText('15');
-  await expect(page.locator('[data-stat=year-hours]').locator('..')).not.toContainText('Forecast');
-  await expect(page.locator('.monthly-stats .summary-stat')).toHaveCount(3);
-  await expect(page.locator('[data-stat=forecast-year-hours]')).toBeVisible();
-  const forecast = parseFloat((await page.locator('[data-stat=forecast-year-hours]').textContent())!);
+  await expect(page.locator('[data-stat=month-logged-hours]')).toHaveText('15 h');
+  await expect(page.locator('[data-stat=month-logged-hours]').locator('..')).not.toContainText('Forecast');
+  await expect(page.locator('.monthly-stats .summary-stat')).toHaveCount(2);
+  await expect(page.locator('[data-stat=month-work-hours]')).toBeVisible();
+  const forecast = parseFloat((await page.locator('[data-stat=month-work-hours]').textContent())!);
   expect(forecast).toBeGreaterThan(15);
-  await expect(page.locator('[data-stat=leave-pto]')).toHaveText('10.28 h');
-  await expect(page.locator('[data-stat=leave-holiday]')).toHaveText('25 h');
-  await expect(page.locator('[data-stat=leave-birthday]')).toHaveText('26 h');
+  await expect(page.getByRole('region', { name: 'End-of-month balance', exact: true })).toContainText('September 2026');
+  await expect(page.getByText('Set an opening month and balances in Settings.')).toBeVisible();
   await expect(page.locator('[data-stat=current-leave], [data-stat=year-end-leave]')).toHaveCount(0);
   await expect(page.locator('.monthly-view')).not.toContainText(/Leave through|Actuals through|December leave/);
   await expect(page.locator('.monthly-view input[type=date]')).toHaveCount(0);
   await expect(page.locator('main').getByRole('button', { name: /settings/i })).toHaveCount(0);
   await page.clock.runFor(1000);
-  await expect(page.locator('[data-stat=year-hours]')).toHaveText('24');
+  await expect(page.locator('[data-stat=month-logged-hours]')).toHaveText('24 h');
   await nav(page, 'POP');
   await expect(page.locator('[data-stat=pop-worked]')).toHaveText('24');
   await expect(page.locator('.pop-view input[type=date]')).toHaveCount(0);
@@ -484,11 +478,12 @@ test('summary cards use today automatically, refresh at midnight, and keep forec
   await expect(page.locator('main').getByRole('button', { name: /settings/i })).toHaveCount(0);
 });
 
-test('monthly editor separates automatic leave from saved zero and clearing restores inference', async ({ page }) => {
+test('monthly editor distinguishes absent values from entered zero without inventing historical leave', async ({ page }) => {
   const state = await backend(page);
+  state.report = { ...report, settings: { ...report.settings, ...{ autoPto: true } } };
   await page.goto('/?view=monthly');
   const february = page.locator('[data-month="2026-02"] .used-pto');
-  await expect(february).not.toHaveText('0');
+  await expect(february).toHaveText('0');
   await page.getByRole('button', { name: 'Edit February 2026 leave', exact: true }).click();
   const editor = page.getByRole('form', { name: 'February 2026' });
   await expect(editor.getByLabel('PTO entered', { exact: true })).toHaveValue('');
@@ -499,8 +494,11 @@ test('monthly editor separates automatic leave from saved zero and clearing rest
   await page.getByRole('button', { name: 'Edit February 2026 leave', exact: true }).click();
   await editor.getByLabel('PTO entered', { exact: true }).fill('');
   await editor.getByRole('button', { name: 'Save month', exact: true }).click();
-  await expect(february).not.toHaveText('0');
+  await expect(february).toHaveText('0');
   expect(state.report.entries).toHaveLength(0);
+  await nav(page, 'Settings');
+  await expect(page.getByLabel('Auto-fill historical PTO gaps')).toHaveCount(0);
+  await expect(page.locator('.leave-policy')).not.toContainText('unlogged weekday hours');
 });
 
 test('report and leave settings preserve drafts on failure and persist on retry', async ({ page }) => {
@@ -557,4 +555,130 @@ for (const width of [390, 1280]) test(`access and sample settings fit viewport $
   await expect(page.locator('.leave-policy')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `work/settings-${width}.png`, fullPage: true });
+});
+
+
+test('break presets set minutes without selected toggle styling', async ({ page }) => {
+  await backend(page);
+  await page.goto('/?view=calculator');
+  const input = page.getByLabel('Custom break minutes', { exact: true });
+  for (const minutes of [30, 60, 0, 30]) {
+    const button = page.getByRole('button', { name: `${minutes} min`, exact: true });
+    await button.click();
+    await expect(input).toHaveValue(String(minutes));
+    await expect(button).not.toHaveClass(/chip-active/);
+    await expect(button).not.toHaveAttribute('aria-pressed');
+  }
+});
+
+
+test('break minutes round up to six-minute increments on blur', async ({ page }) => {
+  await backend(page);
+  await page.goto('/?view=calculator');
+  const input = page.getByLabel('Custom break minutes', { exact: true });
+  for (const [typed, rounded] of [['7', '12'], ['6', '6'], ['6.1', '12'], ['0', '0'], ['479', '480']]) {
+    await input.fill(typed);
+    await input.blur();
+    await expect(input).toHaveValue(rounded);
+  }
+});
+
+
+test('calendar highlights the actual current day even when it has logged hours', async ({ page }) => {
+  const state = await backend(page);
+  state.logs.push(entry('2026-10-22', 8));
+  await page.goto('/?view=calendar');
+  const today = page.locator('.calendar-day[aria-current="date"]');
+  await expect(today).toHaveClass(/calendar-today/);
+  await expect(today).toHaveClass(/calendar-logged/);
+  await expect(today).toHaveAttribute('aria-label', /^October 22, 2026:/);
+  await page.getByRole('button', { name: 'Previous year', exact: true }).click();
+  await expect(page.locator('.calendar-today')).toHaveCount(0);
+});
+
+
+test('jump to today selects this year and scrolls to the current calendar month', async ({ page }) => {
+  await backend(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/?view=calendar');
+  await page.getByRole('button', { name: 'Previous year', exact: true }).click();
+  await page.getByRole('button', { name: 'Jump to today', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'October 2026', exact: true })).toBeInViewport();
+  await expect(page.locator('.calendar-today')).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+
+test('saved entries can be filtered by month and year', async ({ page }) => {
+  const state = await backend(page);
+  state.logs.push(entry('2026-01-05', 7), entry('2025-01-05', 6));
+  await page.goto('/?view=calendar');
+  const rows = page.locator('.logs-table tbody tr');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('2026-10-01');
+  await page.getByLabel('Saved entries month', { exact: true }).selectOption('01');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('2026-01-05');
+  await page.getByLabel('Saved entries year', { exact: true }).selectOption('2025');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('2025-01-05');
+  await page.getByLabel('Saved entries month', { exact: true }).selectOption('02');
+  await expect(page.getByText('No entries recorded for February 2025.')).toBeVisible();
+});
+
+
+test('monthly cards stay tied to today while the table year changes', async ({ page }) => {
+  const state = await backend(page);
+  state.report = { ...report, settings: { ...report.settings, openingMonth: '2025-12', openingPto: 100 }, entries: [] };
+  state.logs.push(entry('2025-12-02', 8));
+  await page.goto('/?view=monthly');
+  const cards = page.locator('.monthly-stats');
+  await expect(cards.locator('.summary-stat')).toHaveCount(2);
+  await expect(cards).toContainText('September 2026');
+  await expect(cards).toContainText('October 2026');
+  const before = await cards.textContent();
+  const select = page.getByLabel('Monthly summary year', { exact: true });
+  await expect(page.locator('thead .month-column').getByRole('combobox')).toHaveCount(1);
+  await select.selectOption('2025');
+  await expect(page.locator('[data-month="2026-10"]')).toHaveCount(0);
+  await expect(cards).toHaveText(before!);
+  await expect(page.getByText('Calculation details', { exact: true })).toHaveCount(0);
+});
+
+
+test('POP rows highlight active inclusive boundaries and upcoming periods', async ({ page }) => {
+  const state = await backend(page);
+  state.periods = [
+    { id: 'past', name: 'Past', startDate: '2026-09-01', endDate: '2026-10-21', targetHours: 100 },
+    { id: 'current', name: 'Current', startDate: '2026-10-22', endDate: '2026-10-23', targetHours: 16 },
+    { id: 'next', name: 'Next', startDate: '2026-10-24', endDate: '2026-11-30', targetHours: 100 },
+  ];
+  await page.goto('/?view=pop');
+  await expect(page.getByText('Calculation details', { exact: true })).toHaveCount(0);
+  const current = page.locator('[data-pop=current]');
+  await expect(current).toHaveAttribute('aria-current', 'date');
+  await expect(current).toHaveClass(/current-month-row/);
+  await expect(page.locator('[data-pop=next]')).toHaveClass(/future-month-row/);
+  await expect(page.locator('[data-pop=past]')).not.toHaveClass(/current-month-row|future-month-row/);
+  await page.clock.setFixedTime(new Date('2026-10-23T12:00:00'));
+  await page.reload();
+  await expect(current).toHaveClass(/current-month-row/);
+  await page.clock.setFixedTime(new Date('2026-10-24T12:00:00'));
+  await page.reload();
+  await expect(current).not.toHaveClass(/current-month-row/);
+  await expect(page.locator('[data-pop=next]')).toHaveAttribute('aria-current', 'date');
+});
+
+
+test('legacy personal browser records are not offered for import or read into the cloud workspace', async ({ page }) => {
+  const state = await backend(page);
+  const legacy = JSON.stringify([{ id: 'legacy', date: '2025-01-01', totalHours: 9 }]);
+  await page.addInitScript(value => localStorage.setItem('work_hours_tracker_time_logs', value), legacy);
+  await page.goto('/?view=settings');
+  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Import existing browser data' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Export browser data JSON' })).toHaveCount(0);
+  expect(state.requests.some(request => request.path.includes('import_browser'))).toBe(false);
+  expect(state.logs).toHaveLength(1);
+  expect(await page.evaluate(() => localStorage.getItem('work_hours_tracker_time_logs'))).toBe(legacy);
 });

@@ -98,11 +98,11 @@ describe('Isolated sample workspace', () => {
 
 describe('Monthly report persistence', () => {
   beforeEach(clearStorageForTesting);
-  it.each(['personal', 'sample2026'] as const)('migrates legacy %s PTO policy once without losing report data or later opt-outs', (dataset) => {
+  it.each(['personal', 'sample2026'] as const)('reads legacy %s inputs without enabling inference or rewriting stored records', (dataset) => {
     const key = `work_hours_tracker_${dataset}_monthly_report`;
     const legacy = getMonthlyReportState(dataset);
     delete legacy.ptoPolicyVersion;
-    legacy.settings.autoPto = false;
+    Object.assign(legacy.settings, { autoPto: true });
     legacy.settings.openingPto = 91.23;
     legacy.entries = [{ id: 'override', date: '2026-03-31', category: 'pto', hours: 0 }];
     legacy.projectedWork = { '2026-11': 144 };
@@ -113,9 +113,10 @@ describe('Monthly report persistence', () => {
     } });
     try {
       const migrated = getMonthlyReportState(dataset);
-      expect(migrated).toEqual({ ...legacy, ptoPolicyVersion: 1, settings: { ...legacy.settings, autoPto: true } });
-      expect(JSON.parse(store.get(key)!)).toEqual(migrated);
-      migrated.settings.autoPto = false;
+      expect(migrated.entries).toEqual(legacy.entries);
+      expect(migrated.settings.openingPto).toBe(91.23);
+      expect(migrated.settings).not.toHaveProperty('autoPto');
+      expect(store.get(key)).toBe(JSON.stringify(legacy));
       saveMonthlyReportState(migrated, dataset);
       expect(getMonthlyReportState(dataset)).toEqual(migrated);
     } finally {

@@ -29,6 +29,11 @@ jobs:
       - name: Build static production bundle
         run: npm run build
 
+      - name: Run browser regression suite
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: npm run test:browser
+
       - name: Verify build artifacts
         run: |
           test -f dist/index.html || exit 1

@@ -4,6 +4,7 @@ import { Calendar as CalendarIcon, Trash2, Edit3, Plus, X } from 'lucide-react';
 import { MONTH_NAMES, WEEKDAY_NAMES, getFederalHolidays, getMonthCells, getMonthSummary } from '../utils/calendar';
 import { roundToTenth } from '../utils/calculations';
 import { formatNumber } from '../utils/format';
+import { useTodayDate } from '../hooks/useTodayDate';
 
 interface CalendarViewProps {
   logs: TimeLog[];
@@ -16,6 +17,7 @@ interface CalendarViewProps {
 export const CalendarView: React.FC<CalendarViewProps> = ({
   logs, isSample, onNavigateToCalculator, onDeleteLog, onSaveLog,
 }) => {
+  const today = useTodayDate();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const remove = async (date: string) => {
@@ -25,7 +27,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
   const [selectedYear, setSelectedYear] = useState(isSample ? 2026 : new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const currentMonth = useRef<HTMLElement>(null);
+  const [jumpRequest, setJumpRequest] = useState(0);
+  useEffect(() => {
+    if (jumpRequest) currentMonth.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [selectedYear, jumpRequest]);
+  const jumpToToday = () => { setSelectedYear(Number(today.slice(0, 4))); setJumpRequest(value => value + 1); };
+  const [selectedMonth, setSelectedMonth] = useState(today.slice(5, 7));
+  const entryYears = Array.from(new Set([selectedYear, Number(today.slice(0, 4)), ...logs.map(log => Number(log.date.slice(0, 4)))])).sort((a, b) => b - a);
   const yearlyLogs = logs.filter((log) => log.date.startsWith(`${selectedYear}-`)).sort((a, b) => b.date.localeCompare(a.date));
+  const savedLogs = yearlyLogs.filter(log => selectedMonth === 'all' || log.date.slice(5, 7) === selectedMonth);
+  const entriesPeriod = `${selectedMonth === 'all' ? 'all months in' : MONTH_NAMES[Number(selectedMonth) - 1]} ${selectedYear}`;
   const logsByDate = new Map(yearlyLogs.map((log) => [log.date, log]));
   const holidays = getFederalHolidays(selectedYear);
   const totalYearHours = roundToTenth(yearlyLogs.reduce((sum, log) => sum + log.totalHours, 0));
@@ -43,7 +55,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           </div>
         </div>
         <div className="kpi-card"><span className="kpi-label">Logged days</span><span className="kpi-value">{yearlyLogs.filter((log) => log.totalHours > 0).length}</span></div>
-        <div className="kpi-card"><span className="kpi-label">Logged hours</span><span className="kpi-value">{formatNumber(totalYearHours, 1)}</span></div>
+        <div className="kpi-card"><div className="kpi-heading"><span className="kpi-label">Logged hours</span><button type="button" className="btn-chip" onClick={jumpToToday}>Jump to today</button></div><span className="kpi-value">{formatNumber(totalYearHours, 1)}</span></div>
       </div>
 
       <div className="calendar-legend" aria-label="Calendar legend">
@@ -55,7 +67,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         {MONTH_NAMES.map((monthName, month) => {
           const summary = getMonthSummary(yearlyLogs, selectedYear, month);
           return (
-            <section key={month} className="month-calendar calculator-card" aria-label={`${monthName} ${selectedYear}`}>
+            <section key={month} ref={selectedYear === Number(today.slice(0, 4)) && month === Number(today.slice(5, 7)) - 1 ? currentMonth : undefined} className="month-calendar calculator-card" aria-label={`${monthName} ${selectedYear}`}>
               <div className="month-heading"><h3>{monthName}</h3><span>{formatNumber(summary.hours, 1)} h</span></div>
               <div className="month-weekdays" aria-hidden="true">{WEEKDAY_NAMES.map((day) => <span key={day}>{day}</span>)}</div>
               <div className="month-days">
@@ -65,7 +77,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   const label = `${monthName} ${day.day}, ${selectedYear}: ${log ? `${formatNumber(log.totalHours, 1)} hours` : 'no entry'}${day.holiday ? `; ${day.holiday}` : ''}`;
                   return (
                     <button key={day.date} type="button" onClick={() => setSelectedDate(day.date)}
-                      className={`calendar-day${day.isWeekend ? ' calendar-weekend' : ''}${day.holiday ? ' calendar-holiday' : ''}${log ? ' calendar-logged' : ''}`}
+                      className={`calendar-day${day.isWeekend ? ' calendar-weekend' : ''}${day.holiday ? ' calendar-holiday' : ''}${log ? ' calendar-logged' : ''}${day.date === today ? ' calendar-today' : ''}`}
+                      aria-current={day.date === today ? 'date' : undefined}
                       aria-label={label} title={`${label}${log?.notes ? `; ${log.notes}` : ''}`}>
                       <span className="calendar-date">{day.day}{day.holiday && <span className="holiday-marker" aria-hidden="true">•</span>}</span>
                       <span className="calendar-hours">{log ? formatNumber(log.totalHours, 1) : '—'}</span>
@@ -80,13 +93,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       </div>
 
       <div className="calculator-card table-section">
-        <div className="table-header-row"><h3 className="card-title">Saved Entries for {selectedYear}</h3><button type="button" onClick={onNavigateToCalculator} className="btn-primary btn-small"><Plus size={16} />New Daily Log</button></div>
-        {yearlyLogs.length === 0 ? (
-          <div className="empty-state"><CalendarIcon size={40} className="empty-icon" /><p>No entries recorded for {selectedYear}.</p></div>
+        <div className="table-header-row"><div className="saved-entries-heading"><h3 className="card-title">Saved Entries for</h3><select className="form-input" aria-label="Saved entries month" value={selectedMonth} onChange={event => setSelectedMonth(event.target.value)}><option value="all">All months</option>{MONTH_NAMES.map((month, index) => <option key={month} value={String(index + 1).padStart(2, '0')}>{month}</option>)}</select><select className="form-input" aria-label="Saved entries year" value={selectedYear} onChange={event => setSelectedYear(Number(event.target.value))}>{entryYears.map(year => <option key={year} value={year}>{year}</option>)}</select></div><button type="button" onClick={onNavigateToCalculator} className="btn-primary btn-small"><Plus size={16} />New Daily Log</button></div>
+        {savedLogs.length === 0 ? (
+          <div className="empty-state"><CalendarIcon size={40} className="empty-icon" /><p>No entries recorded for {entriesPeriod}.</p></div>
         ) : (
           <div className="table-responsive"><table className="logs-table">
             <thead><tr><th>Date</th><th>Day</th><th>Hours</th><th>Holiday</th><th>Notes</th><th>Actions</th></tr></thead>
-            <tbody>{yearlyLogs.map((log) => {
+            <tbody>{savedLogs.map((log) => {
               const date = new Date(`${log.date}T12:00:00`);
               const weekend = date.getDay() === 0 || date.getDay() === 6;
               return <tr key={log.id} className={`${weekend ? 'weekend-row' : ''} ${holidays[log.date] ? 'holiday-row' : ''}`}>

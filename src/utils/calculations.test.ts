@@ -163,3 +163,17 @@ describe('24-hour entries and tenth-hour breaks', () => {
     expect(scenarios.out?.hours).toBe(7.4);
   });
 });
+
+
+describe('Out Target rounds calculated hours down', () => {
+  it('floors partial tenths, preserving exact tenths, breaks, and overnight shifts', () => {
+    for (const [start, end, rest, expected] of [
+      ['08:00', '16:35', 0, 8.5], ['08:00', '16:36', 0, 8.6],
+      ['08:00', '16:05', 0, 8], ['22:00', '06:35', 30, 8],
+      ['08:00', '08:05', 6, 0], ['08:00', '08:06', 0, 0.1],
+    ] as const) expect(getShiftScenarios(start, end, rest, '8', end).out?.hours).toBe(expected);
+    const scenarios = getShiftScenarios('08:00', '16:35', 0, '8', '16:35');
+    expect(scenarios.live?.hours).toBe(8.6);
+    expect(scenarios.out?.hours).toBe(8.5);
+  });
+});

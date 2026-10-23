@@ -156,9 +156,11 @@ export function getShiftScenarios(
   targetOut: string
 ) {
   const validStart = timeStringToMinutes(timeIn) !== null;
-  const hoursAt = (timeOut: string) =>
+  const hoursAt = (timeOut: string, roundDown = false) =>
     validStart && timeStringToMinutes(timeOut) !== null
-      ? { timeOut, hours: calculateWorkedHours(timeIn, timeOut, breakMinutes).roundedHours }
+      ? { timeOut, hours: roundDown
+        ? Math.floor(calculateWorkedHours(timeIn, timeOut, breakMinutes).rawHours * 10 + 1e-9) / 10
+        : calculateWorkedHours(timeIn, timeOut, breakMinutes).roundedHours }
       : null;
   const hours = Number(targetHoursInput);
   const shift = Number.isFinite(hours) && hours >= 0.1 && hours <= 24
@@ -168,6 +170,6 @@ export function getShiftScenarios(
   return {
     live: hoursAt(currentTime),
     shift: shift ? { timeOut: shift.timeOut24, hours } : null,
-    out: hoursAt(targetOut),
+    out: hoursAt(targetOut, true),
   };
 }

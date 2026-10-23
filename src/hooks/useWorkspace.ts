@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { MonthlyReportState, PeriodOfPerformance, WorkspaceData } from '../types';
 import { createDefaultMonthlyReport } from '../utils/monthlySummary';
-import { createSupabaseRepository, normalizeMonthlyReport } from '../services/supabaseRepository';
-import { defaultPeriods, deleteTimeLog, getAllTimeLogs, getMonthlyReportState, getSamplePeriods, initializeSampleLogs, LogDataset, replaceSampleWorkspace, saveMonthlyReportState, saveSamplePeriods, saveTimeLog } from '../services/storage';
+import { createSupabaseRepository } from '../services/supabaseRepository';
+import { defaultPeriods, deleteTimeLog, getMonthlyReportState, getSamplePeriods, initializeSampleLogs, LogDataset, replaceSampleWorkspace, saveMonthlyReportState, saveSamplePeriods, saveTimeLog } from '../services/storage';
 import { parseTimesheetJson, validatePeriods } from '../services/jsonBackup';
 
 type Data = WorkspaceData;
@@ -90,14 +90,6 @@ export function useWorkspace(dataset: LogDataset, client: SupabaseClient | null,
       const saved = repository ? await repository.savePeriods(valid) : (saveSamplePeriods(valid), valid);
       apply({ periods: saved });
     }),
-    importBrowser: () => operation(async () => {
-      if (!repository) throw new Error('Sign in to Supabase before importing personal browser data.');
-      const count = await repository.importBrowserData(getAllTimeLogs(), getLegacyReport());
-      assertCurrent();
-      const data = await repository.load();
-      apply(data);
-      return count;
-    }),
     importJson: (contents: string) => operation(async () => {
       const backup = parseTimesheetJson(contents);
       if (backup.dataset && backup.dataset !== dataset) throw new Error(`This backup belongs to ${backup.dataset === 'sample2026' ? '2026 sample data' : 'My data'}. Switch data source before importing it.`);
@@ -120,11 +112,4 @@ export function useWorkspace(dataset: LogDataset, client: SupabaseClient | null,
   };
 }
 
-export function getLegacyReport(): MonthlyReportState | null {
-  // Reading a legacy report must not perform the old storage migration or alter originals.
-  try {
-    const stored = window.localStorage.getItem('work_hours_tracker_personal_monthly_report');
-    return stored ? normalizeMonthlyReport(JSON.parse(stored)) : null;
-  } catch { return null; }
-}
 export type Workspace = ReturnType<typeof useWorkspace>;

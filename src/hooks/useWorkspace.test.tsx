@@ -2,7 +2,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { useWorkspace, getLegacyReport } from './useWorkspace';
+import { useWorkspace } from './useWorkspace';
 import { createDefaultMonthlyReport } from '../utils/monthlySummary';
 import { clearStorageForTesting, defaultPeriods, getAllTimeLogs, saveTimeLog } from '../services/storage';
 import { LogDataset } from '../services/storage';
@@ -14,7 +14,7 @@ const client = {} as SupabaseClient;
 const log = (date: string) => ({ id: date, date, totalHours: 8, notes: 'cloud', createdAt: '', updatedAt: '' });
 const data = (date = '2026-10-01') => ({ logs: [log(date)], report: createDefaultMonthlyReport(), periods: defaultPeriods() });
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done; }); return { promise, resolve }; }
-function repository() { return { load: vi.fn(async () => data()), saveLog: vi.fn(async () => log('2026-10-02')), deleteLog: vi.fn(async () => {}), saveReport: vi.fn(async state => state), savePeriods: vi.fn(async periods => periods), replaceWorkspace: vi.fn(async () => 1), importBrowserData: vi.fn(async () => 1) }; }
+function repository() { return { load: vi.fn(async () => data()), saveLog: vi.fn(async () => log('2026-10-02')), deleteLog: vi.fn(async () => {}), saveReport: vi.fn(async state => state), savePeriods: vi.fn(async periods => periods), replaceWorkspace: vi.fn(async () => 1) }; }
 function hook(userId: string | undefined = 'a') { return renderHook(({ userId, dataset }) => useWorkspace(dataset, client, userId), { initialProps: { userId: userId as string | undefined, dataset: 'personal' as LogDataset } }); }
 beforeEach(() => { clearStorageForTesting(); mocks.create.mockReset(); });
 afterEach(cleanup);
@@ -76,13 +76,12 @@ describe('Workspace persistence and isolation', () => {
     expect(result.current.ready).toBe(true);
     expect(result.current.logs).toHaveLength(1);
   });
-  it('keeps sample data entirely local and rejects browser import', async () => {
+  it('keeps sample data entirely local', async () => {
     saveTimeLog('2026-10-21', 9, 'personal original');
     const { result } = renderHook(() => useWorkspace('sample2026', client, 'a'));
     await waitFor(() => expect(result.current.ready).toBe(true));
     expect(result.current.logs).toHaveLength(149);
     await act(async () => { await result.current.saveLog('2026-10-21', 4); });
-    await act(async () => { await expect(result.current.importBrowser()).rejects.toThrow('Sign in'); });
     expect(mocks.create).not.toHaveBeenCalled();
     expect(getAllTimeLogs()).toHaveLength(1);
     expect(getAllTimeLogs()[0].notes).toBe('personal original');
@@ -131,22 +130,22 @@ describe('Workspace persistence and isolation', () => {
     expect(result.current.logs).toHaveLength(149);
     expect(result.current.logs.some(item => item.notes === 'cloud')).toBe(false);
   });
-  it('supports load retries and persists reports and explicit personal browser imports', async () => {
+  it('supports load retries and persists reports without reading legacy personal browser records', async () => {
     const repo = repository(); repo.load.mockRejectedValueOnce(new Error('Schema missing')); mocks.create.mockReturnValue(repo);
     const { result } = hook();
     await waitFor(() => expect(result.current.error).toBe('Schema missing'));
     expect(result.current.ready).toBe(false);
     act(() => result.current.reload());
     await waitFor(() => expect(result.current.ready).toBe(true));
-    const report = createDefaultMonthlyReport(); report.settings.autoPto = false;
+    const report = createDefaultMonthlyReport();
     await act(async () => { await result.current.saveReport(report); });
-    expect(result.current.report.settings.autoPto).toBe(false);
+    expect(result.current.report.settings).not.toHaveProperty('autoPto');
     saveTimeLog('2026-09-01', 7);
     const original = JSON.stringify({ ...report, ptoPolicyVersion: 0 });
     localStorage.setItem('work_hours_tracker_personal_monthly_report', original);
-    expect(getLegacyReport()?.settings.autoPto).toBe(true);
-    await act(async () => { expect(await result.current.importBrowser()).toBe(1); });
-    expect(repo.importBrowserData).toHaveBeenCalledWith(getAllTimeLogs(), getLegacyReport());
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(result.current.logs).toEqual(data().logs);
     expect(localStorage.getItem('work_hours_tracker_personal_monthly_report')).toBe(original);
   });
 });

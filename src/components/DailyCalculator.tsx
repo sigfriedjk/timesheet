@@ -124,7 +124,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
         {/* Left Column: Form Controls */}
         <section className="calculator-card form-section" aria-labelledby="controls-heading">
           <h3 id="controls-heading" className="card-title">
-            Today
+            Entry Creator
           </h3>
 
           <form onSubmit={handleLogSubmit} className="calculator-form">
@@ -149,7 +149,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                   onClick={() => setDate(getTodayDateString())}
                   className={`btn-chip ${isToday ? 'chip-active' : ''}`}
                 >
-                  Today
+                  Entry Creator
                 </button>
               </div>
             </div>
@@ -213,7 +213,8 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                   max="480"
                   step="1"
                   value={breakMinutes}
-                  onChange={(e) => setBreakMinutes(Math.min(480, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+                  onChange={(e) => setBreakMinutes(Math.min(480, Math.max(0, Number(e.target.value) || 0)))}
+                  onBlur={() => setBreakMinutes(minutes => Math.ceil(minutes / 6) * 6)}
                   className="form-input custom-break-input"
                   aria-label="Custom break minutes"
                 />
@@ -222,7 +223,7 @@ export const DailyCalculator: React.FC<DailyCalculatorProps> = ({
                     key={mins}
                     type="button"
                     onClick={() => setBreakMinutes(mins)}
-                    className={`btn-chip ${breakMinutes === mins ? 'chip-active' : ''}`}
+                    className="btn-chip"
                   >
                     {mins} min
                   </button>

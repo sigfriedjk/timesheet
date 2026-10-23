@@ -1,8 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Download, Upload } from 'lucide-react';
-import { getLegacyReport, Workspace } from '../hooks/useWorkspace';
+import { Workspace } from '../hooks/useWorkspace';
 import { exportTimesheetJson, parseTimesheetJson, TimesheetImport } from '../services/jsonBackup';
-import { getAllTimeLogs } from '../services/storage';
 
 function downloadJson(name: string, contents: string) {
   const href = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
@@ -22,9 +21,6 @@ export const DataTransferSettings: React.FC<{ workspace: Workspace; isSample: bo
   const selection = useRef(0);
   const dataset = isSample ? 'sample2026' : 'personal';
   const disabled = reading || busy || workspace.busy || !workspace.ready;
-  const legacy = isSample ? [] : getAllTimeLogs();
-  const legacyReport = isSample ? null : getLegacyReport();
-  const hasLegacy = legacy.length > 0 || legacyReport !== null;
   const run = async (action: () => Promise<void>) => {
     setBusy(true); setStatus(''); setError('');
     try { await action(); } catch (error) { setError(error instanceof Error ? error.message : 'The request could not be completed.'); }
@@ -67,19 +63,6 @@ export const DataTransferSettings: React.FC<{ workspace: Workspace; isSample: bo
       setStatus(`Replaced this workspace with ${count} time entries and the file's leave, POP, and settings data.`);
       setConfirmed(false);
     })}><Upload size={16} />{busy ? 'Working…' : 'Import JSON'}</button></div>
-    {!isSample && <div className="browser-import">
-      <p>{hasLegacy ? `${legacy.length} previous personal entries are available in this browser. This browser-migration option only adds missing dates/settings and keeps existing cloud data and browser originals.` : 'No previous personal records were found in this browser. Choose a JSON file above to import a backup from another browser or device.'}</p>
-      <div className="sample-actions">
-        <button type="button" className="btn-secondary" disabled={disabled || !hasLegacy} onClick={() => void run(async () => {
-          const count = await workspace.importBrowser();
-          setStatus(`Imported ${count} missing browser entries. Existing cloud data was kept.`);
-        })}>Import existing browser data</button>
-        {hasLegacy && <button type="button" className="btn-secondary" disabled={busy} onClick={() => void run(async () => {
-          downloadJson('timesheet-personal-browser-backup.json', exportTimesheetJson(legacy, legacyReport, 'personal'));
-          setStatus('Exported previous personal browser data.');
-        })}>Export browser data JSON</button>}
-      </div>
-    </div>}
     <p className="settings-status" role="status">{status}</p>
     {error && <p className="form-error" role="alert">{error}</p>}
   </section>;
