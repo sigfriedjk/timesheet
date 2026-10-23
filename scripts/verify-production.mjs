@@ -117,7 +117,7 @@ try {
     await send('Page.navigate', { url }, sessionId);
     let ready = false;
     for (let i = 0; i < 200; i++) {
-      ready = await evaluate(name === 'monthly' ? `document.querySelector('[data-stat=year-hours]')?.textContent === '1210.7'` : name === 'pop' ? `document.querySelector('[data-stat=pop-worked]')?.textContent === '1210.7'` : name === 'sample' ? `document.querySelectorAll('.calendar-logged').length === 149` : `!!document.querySelector(${JSON.stringify(selector)})`);
+      ready = await evaluate(name === 'monthly' ? `!!document.querySelector('[data-stat=month-logged-hours]')` : name === 'pop' ? `document.querySelector('[data-stat=pop-worked]')?.textContent === '1210.7'` : name === 'sample' ? `document.querySelectorAll('.calendar-logged').length === 149` : `!!document.querySelector(${JSON.stringify(selector)})`);
       if (ready) break;
       await delay(200);
     }
@@ -133,8 +133,8 @@ try {
       if (!cleanCalendar) throw new Error('Calendar contains removed sample controls, title, or month-card details');
       report.pages.push({ name, url, rendered: true, ...counts });
     } else if (name === 'monthly') {
-      const summary = await evaluate(`({ rows: document.querySelectorAll('.monthly-table tbody tr').length, expectedRows: (Math.max(2026, new Date().getFullYear()) - 2026 + 1) * 12, actual: Number(document.querySelector('[data-stat=year-hours]').textContent), forecast: parseFloat(document.querySelector('[data-stat=forecast-year-hours]').textContent), leave: ['pto', 'holiday', 'birthday'].map(category => parseFloat(document.querySelector('[data-stat=leave-' + category + ']').textContent)), cutoffControls: document.querySelectorAll('.monthly-view input[type=date]').length })`);
-      if (summary.rows !== summary.expectedRows || summary.actual !== 1210.7 || !(summary.forecast >= summary.actual) || !summary.leave.every(Number.isFinite) || summary.cutoffControls !== 0) throw new Error(`Monthly report failed: ${JSON.stringify(summary)}`);
+      const summary = await evaluate(`({ rows: document.querySelectorAll('.monthly-table tbody tr').length, expectedRows: (Math.max(2026, new Date().getFullYear()) - 2026 + 1) * 12, cards: document.querySelectorAll('.monthly-stats .summary-stat').length, actual: parseFloat(document.querySelector('[data-stat=month-logged-hours]').textContent), forecast: parseFloat(document.querySelector('[data-stat=month-work-hours]').textContent), cutoffControls: document.querySelectorAll('.monthly-view input[type=date]').length })`);
+      if (summary.rows !== summary.expectedRows || summary.cards !== 2 || !Number.isFinite(summary.actual) || !(summary.forecast >= summary.actual) || summary.cutoffControls !== 0) throw new Error(`Monthly report failed: ${JSON.stringify(summary)}`);
       if (!await evaluate(`document.querySelector('select[aria-label="Monthly summary year"]').value === 'all' && document.querySelector('[data-month="2026-01"] th').textContent.includes('Jan 2026') && document.querySelector('.monthly-table-scroll').scrollHeight <= document.querySelector('.monthly-table-scroll').clientHeight + 1`)) throw new Error('Monthly summary must default to All Years, label month/year pairs, and use page scrolling');
       const automaticPto = await evaluate(`({ january: Number(document.querySelector('[data-month="2026-01"] .used-pto').textContent), february: Number(document.querySelector('[data-month="2026-02"] .used-pto').textContent) })`);
       if (automaticPto.january !== 17.7 || automaticPto.february !== 152) throw new Error(`Automatic PTO gaps failed: ${JSON.stringify(automaticPto)}`);

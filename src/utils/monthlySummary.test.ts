@@ -151,3 +151,24 @@ describe('Monthly work and leave summary', () => {
     expect(regular.yearEndBalance).toEqual(regular.rows[11].balance);
   });
 });
+
+
+it('anchors monthly cards to today across year filters and January boundaries', () => {
+  const state = createDefaultMonthlyReport(2025);
+  state.settings.openingMonth = '2025-12';
+  state.settings.openingPto = 100;
+  const logs = [log('2025-12-02', 8), log('2026-01-02', 7)];
+  const before = JSON.stringify({ state, logs });
+  const all = buildMonthlySummary(logs, state, 'all', '2026-01-22');
+  expect(all.previousMonth.key).toBe('2025-12');
+  expect(all.currentMonth.key).toBe('2026-01');
+  for (const year of [2024, 2025, 2026, 2027]) {
+    const selected = buildMonthlySummary(logs, state, year, '2026-01-22');
+    expect(selected.previousMonth).toEqual(all.previousMonth);
+    expect(selected.currentMonth).toEqual(all.currentMonth);
+  }
+  expect(JSON.stringify({ state, logs })).toBe(before);
+  const unopened = buildMonthlySummary([], createDefaultMonthlyReport(2029), 'all', '2026-01-22');
+  expect(unopened.previousMonth.actualBalance).toBeNull();
+  expect(unopened.currentMonth.key).toBe('2026-01');
+});

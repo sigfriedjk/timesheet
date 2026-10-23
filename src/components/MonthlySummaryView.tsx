@@ -33,15 +33,30 @@ export const MonthlySummaryView: React.FC<Props> = ({ logs, state, onChange }) =
   const report = useMemo(() => buildMonthlySummary(logs, state, year === 'all' ? 'all' : Number(year), asOf), [logs, state, year, asOf]);
   const t = report.totals;
   const closing = report.rows[report.rows.length - 1];
+  const current = report.currentMonth;
+  const previous = report.previousMonth;
+  const monthLabel = (row: MonthlyRow) => `${MONTH_NAMES[row.month]} ${row.year}`;
   return <div className="monthly-view">
     <div className="monthly-toolbar">
       <label className="as-of-control">Months in<select className="form-input" aria-label="Monthly summary year" value={year} disabled={saving} onChange={event => { setYear(event.target.value); setEditing(null); }}><option value="all">All Years</option>{range.years.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
       <button type="button" className="btn-secondary accrual-toggle" aria-expanded={showAccrued} aria-controls="monthly-summary-table" onClick={() => setShowAccrued(!showAccrued)}>{showAccrued ? <ChevronDown size={15} /> : <ChevronRight size={15} />}{showAccrued ? 'Hide accrued' : 'Show accrued'}</button>
     </div>
     <div className="monthly-stats">
-      <div className="summary-stat"><span className="summary-label">{year === 'all' ? 'Logged hours' : 'Logged year hours'}</span><strong data-stat="year-hours">{fixed(t.actualHours, 1)}</strong></div>
-      <div className="summary-stat"><span className="summary-label">Leave balance</span><BalanceDetail value={report.currentBalance} /></div>
-      <div className="summary-stat"><span className="summary-label">{year === 'all' ? 'Forecast total' : 'Forecast year total'}</span><strong data-stat="forecast-year-hours">{fixed(t.workHours, 1)} <small>h</small></strong></div>
+      <section className="summary-stat" aria-label="End-of-month balance">
+        <h3 className="summary-label">End-of-month balance</h3><span className="summary-period">{monthLabel(previous)}</span>
+        <BalanceDetail value={previous.actualBalance} />
+      </section>
+      <section className="summary-stat" aria-label="Current month">
+        <h3 className="summary-label">Current month</h3><span className="summary-period">{monthLabel(current)}</span>
+        <dl className="current-month-breakdown">{[
+          { label: 'Weekday hours', value: current.weekdayHours, stat: 'month-weekday-hours' },
+          { label: 'Holidays', value: current.holidayCount, stat: 'month-holidays', count: true },
+          { label: 'Logged hours', value: current.actualHours, stat: 'month-logged-hours' },
+          { label: 'Work total', value: current.workHours, stat: 'month-work-hours' },
+          { label: '12-month total', value: current.rollingTotal, stat: 'month-rolling-hours' },
+          { label: 'Leave needed', value: current.leaveNeeded, stat: 'month-leave-needed' },
+        ].map(({ label, value, stat, count }) => <div key={stat}><dt>{label}</dt><dd data-stat={stat}>{fixed(value, count ? 0 : 1)}{!count && <small> h</small>}</dd></div>)}</dl>
+      </section>
     </div>
     {editing && <MonthEditor key={editing} row={report.rows.find(row => row.key === editing)!} asOf={asOf} state={state} onChange={onChange} onClose={closeEditor} onSaving={setSaving} />}
     <div className="monthly-table-scroll" tabIndex={0} aria-label="Monthly work and leave summary; scroll horizontally for all columns">

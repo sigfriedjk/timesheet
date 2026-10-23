@@ -168,7 +168,7 @@ test('sample calculator, calendar, monthly, POP and settings work offline withou
   await page.goto('/?sample=2026');
   await expect(page.locator('.calendar-logged')).toHaveCount(149);
   await nav(page, 'Monthly');
-  await expect(page.locator('[data-stat=year-hours]')).toHaveText('1210.7');
+  await expect(page.locator('[data-stat=month-logged-hours]')).toHaveText('97.8 h');
   await nav(page, 'POP');
   await expect(page.locator('[data-stat=pop-worked]')).toHaveText('1210.7');
   await nav(page, 'Calculator');
@@ -181,7 +181,7 @@ test('sample calculator, calendar, monthly, POP and settings work offline withou
   await expect(page.getByText('Sample data reset to the original 149 entries.')).toBeVisible();
   await page.context().setOffline(true);
   await nav(page, 'Monthly');
-  await expect(page.locator('[data-stat=year-hours]')).toHaveText('1210.7');
+  await expect(page.locator('[data-stat=month-logged-hours]')).toHaveText('97.8 h');
   expect(state.requests).toHaveLength(0);
 });
 
@@ -352,7 +352,7 @@ for (const width of [390, 1280]) test(`summaries default to All Years and show e
   await expect(page.locator('.monthly-table tbody tr')).toHaveCount(50);
   await expect(page.locator('[data-month="2025-01"] th')).toContainText('Jan 2025');
   await expect(page.locator('[data-month="2026-01"] th')).toContainText('Jan 2026');
-  await expect(page.locator('[data-stat=year-hours]')).toHaveText('17');
+  await expect(page.locator('.monthly-table tfoot td').nth(2)).toHaveText('17');
   const current = page.locator('[data-month="2026-10"]');
   const future = page.locator('[data-month="2027-01"]');
   const previous = page.locator('[data-month="2025-10"]');
@@ -372,7 +372,7 @@ for (const width of [390, 1280]) test(`summaries default to All Years and show e
   await expect(page.locator('.monthly-table tbody tr')).toHaveCount(12);
   await expect(page.locator('[data-month="2026-01"]')).toHaveCount(0);
   await expect(page.locator('.current-month-row')).toHaveCount(0);
-  await expect(page.locator('[data-stat=year-hours]')).toHaveText('8');
+  await expect(page.locator('.monthly-table tfoot td').nth(2)).toHaveText('8');
   await page.getByRole('button', { name: 'Edit January 2025 leave', exact: true }).click();
   const editor = page.getByRole('form', { name: 'January 2025' });
   await editor.getByLabel('PTO entered', { exact: true }).fill('2');
@@ -461,21 +461,20 @@ test('summary cards use today automatically, refresh at midnight, and keep forec
   ] };
   await page.clock.pauseAt(new Date('2026-10-22T23:59:59'));
   await page.goto('/?view=monthly');
-  await expect(page.locator('[data-stat=year-hours]')).toHaveText('15');
-  await expect(page.locator('[data-stat=year-hours]').locator('..')).not.toContainText('Forecast');
-  await expect(page.locator('.monthly-stats .summary-stat')).toHaveCount(3);
-  await expect(page.locator('[data-stat=forecast-year-hours]')).toBeVisible();
-  const forecast = parseFloat((await page.locator('[data-stat=forecast-year-hours]').textContent())!);
+  await expect(page.locator('[data-stat=month-logged-hours]')).toHaveText('15 h');
+  await expect(page.locator('[data-stat=month-logged-hours]').locator('..')).not.toContainText('Forecast');
+  await expect(page.locator('.monthly-stats .summary-stat')).toHaveCount(2);
+  await expect(page.locator('[data-stat=month-work-hours]')).toBeVisible();
+  const forecast = parseFloat((await page.locator('[data-stat=month-work-hours]').textContent())!);
   expect(forecast).toBeGreaterThan(15);
-  await expect(page.locator('[data-stat=leave-pto]')).toHaveText('10.28 h');
-  await expect(page.locator('[data-stat=leave-holiday]')).toHaveText('25 h');
-  await expect(page.locator('[data-stat=leave-birthday]')).toHaveText('26 h');
+  await expect(page.getByRole('region', { name: 'End-of-month balance', exact: true })).toContainText('September 2026');
+  await expect(page.getByText('Set an opening month and balances in Settings.')).toBeVisible();
   await expect(page.locator('[data-stat=current-leave], [data-stat=year-end-leave]')).toHaveCount(0);
   await expect(page.locator('.monthly-view')).not.toContainText(/Leave through|Actuals through|December leave/);
   await expect(page.locator('.monthly-view input[type=date]')).toHaveCount(0);
   await expect(page.locator('main').getByRole('button', { name: /settings/i })).toHaveCount(0);
   await page.clock.runFor(1000);
-  await expect(page.locator('[data-stat=year-hours]')).toHaveText('24');
+  await expect(page.locator('[data-stat=month-logged-hours]')).toHaveText('24 h');
   await nav(page, 'POP');
   await expect(page.locator('[data-stat=pop-worked]')).toHaveText('24');
   await expect(page.locator('.pop-view input[type=date]')).toHaveCount(0);

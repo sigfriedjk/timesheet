@@ -63,7 +63,7 @@ export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, 
   const selectedStart = selectedYear === 'all' ? monthIndex(range.firstMonth) : selectedYear * 12;
   const selectedEnd = selectedYear === 'all' ? monthIndex(range.lastMonth) : selectedStart + 11;
   const historyStart = monthIndex(range.firstMonth);
-  const start = Math.min(opening, selectedStart - 11, historyStart);
+  const start = Math.min(opening, selectedStart - 11, historyStart, cutoffMonth - 1);
   const end = Math.max(selectedEnd, cutoffMonth);
   const logMap = new Map(logs.map(log => [log.date, log]));
   const rows = new Map<number, MonthlyRow>();
@@ -152,6 +152,8 @@ export function buildMonthlySummary(logs: TimeLog[], state: MonthlyReportState, 
   const actualRollingTotal = tenths(completedWindow.reduce((sum, i) => sum + (rows.get(i)?.actualHours ?? 0), 0));
   return {
     rows: selectedRows,
+    previousMonth: rows.get(cutoffMonth - 1)!,
+    currentMonth: rows.get(cutoffMonth)!,
     totals: { weekdayHours: sum('weekdayHours'), holidayCount: sum('holidayCount'), actualHours: sum('actualHours'),
       workHours: sum('workHours'), leaveNeeded: sum('leaveNeeded'), accruedPto: sum('accruedPto'),
       accruedHoliday: sum('accruedHoliday'), accruedBirthday: sum('accruedBirthday'), usedPto: sum('usedPto'),

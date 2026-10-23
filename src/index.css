@@ -943,7 +943,7 @@ body {
 .monthly-toolbar .year-selector { font-family: var(--font-mono); gap: 0.4rem; }
 .as-of-control { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; color: var(--text-muted); font-size: 0.8rem; }
 .as-of-control .form-input { width: auto; padding: 0.4rem 0.55rem; font-size: 0.85rem; color-scheme: dark; }
-.monthly-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+.monthly-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 0.75rem; margin-bottom: 1rem; }
 .summary-stat { min-width: 0; padding: 0.85rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 0.3rem; }
 .summary-stat .summary-label { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); }
 .summary-stat > strong { font-family: var(--font-mono); font-size: 1.45rem; color: #f8fafc; }
@@ -1067,3 +1067,11 @@ button:disabled { cursor: wait; }
 .saved-entries-heading { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
 .saved-entries-heading .card-title { margin: 0; }
 .saved-entries-heading select { width: auto; }
+
+.summary-stat h3.summary-label { margin: 0; }
+.summary-stat .summary-period { font-size: 0.9rem; color: var(--text-main); margin-bottom: 0.5rem; }
+.current-month-breakdown { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.9rem 1rem; margin: 0; }
+.current-month-breakdown dt { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.3rem; }
+.current-month-breakdown dd { margin: 0; font-family: var(--font-mono); color: var(--text-main); font-size: 1.15rem; }
+.current-month-breakdown small { font-size: 0.65rem; color: var(--text-muted); }
+@media (max-width: 600px) { .current-month-breakdown { gap: 0.8rem 0.5rem; } }
