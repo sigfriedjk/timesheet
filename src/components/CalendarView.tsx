@@ -27,6 +27,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
   const [selectedYear, setSelectedYear] = useState(isSample ? 2026 : new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const currentMonth = useRef<HTMLElement>(null);
+  const [jumpRequest, setJumpRequest] = useState(0);
+  useEffect(() => {
+    if (jumpRequest) currentMonth.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [selectedYear, jumpRequest]);
+  const jumpToToday = () => { setSelectedYear(Number(today.slice(0, 4))); setJumpRequest(value => value + 1); };
   const yearlyLogs = logs.filter((log) => log.date.startsWith(`${selectedYear}-`)).sort((a, b) => b.date.localeCompare(a.date));
   const logsByDate = new Map(yearlyLogs.map((log) => [log.date, log]));
   const holidays = getFederalHolidays(selectedYear);
@@ -45,7 +51,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           </div>
         </div>
         <div className="kpi-card"><span className="kpi-label">Logged days</span><span className="kpi-value">{yearlyLogs.filter((log) => log.totalHours > 0).length}</span></div>
-        <div className="kpi-card"><span className="kpi-label">Logged hours</span><span className="kpi-value">{formatNumber(totalYearHours, 1)}</span></div>
+        <div className="kpi-card"><div className="kpi-heading"><span className="kpi-label">Logged hours</span><button type="button" className="btn-chip" onClick={jumpToToday}>Jump to today</button></div><span className="kpi-value">{formatNumber(totalYearHours, 1)}</span></div>
       </div>
 
       <div className="calendar-legend" aria-label="Calendar legend">
@@ -57,7 +63,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         {MONTH_NAMES.map((monthName, month) => {
           const summary = getMonthSummary(yearlyLogs, selectedYear, month);
           return (
-            <section key={month} className="month-calendar calculator-card" aria-label={`${monthName} ${selectedYear}`}>
+            <section key={month} ref={selectedYear === Number(today.slice(0, 4)) && month === Number(today.slice(5, 7)) - 1 ? currentMonth : undefined} className="month-calendar calculator-card" aria-label={`${monthName} ${selectedYear}`}>
               <div className="month-heading"><h3>{monthName}</h3><span>{formatNumber(summary.hours, 1)} h</span></div>
               <div className="month-weekdays" aria-hidden="true">{WEEKDAY_NAMES.map((day) => <span key={day}>{day}</span>)}</div>
               <div className="month-days">

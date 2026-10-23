@@ -597,3 +597,15 @@ test('calendar highlights the actual current day even when it has logged hours',
   await page.getByRole('button', { name: 'Previous year', exact: true }).click();
   await expect(page.locator('.calendar-today')).toHaveCount(0);
 });
+
+
+test('jump to today selects this year and scrolls to the current calendar month', async ({ page }) => {
+  await backend(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/?view=calendar');
+  await page.getByRole('button', { name: 'Previous year', exact: true }).click();
+  await page.getByRole('button', { name: 'Jump to today', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'October 2026', exact: true })).toBeInViewport();
+  await expect(page.locator('.calendar-today')).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
