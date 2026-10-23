@@ -47,8 +47,7 @@ export const MonthlySummaryView: React.FC<Props> = ({ logs, state, onChange }) =
         <dl className="current-month-breakdown">{[
           { label: 'Weekday hours', value: current.weekdayHours, stat: 'month-weekday-hours' },
           { label: 'Holidays', value: current.holidayCount, stat: 'month-holidays', count: true },
-          { label: 'Logged hours', value: current.actualHours, stat: 'month-logged-hours' },
-          { label: 'Work total', value: current.workHours, stat: 'month-work-hours' },
+          { label: 'Forecast work total', value: current.workHours, stat: 'month-work-hours' },
           { label: '12-month total', value: current.rollingTotal, stat: 'month-rolling-hours' },
           { label: 'Leave needed', value: current.leaveNeeded, stat: 'month-leave-needed' },
         ].map(({ label, value, stat, count }) => <div key={stat}><dt>{label}</dt><dd data-stat={stat}>{fixed(value, count ? 0 : 1)}{!count && <small> h</small>}</dd></div>)}</dl>
