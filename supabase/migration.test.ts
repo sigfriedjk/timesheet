@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
 let db: PGlite;
-const report = { settings: { autoPto: false }, entries: [], projectedWork: {} };
+const report = { settings: { autoPto: false, ptoAccrualRate: 0.125 }, entries: [], projectedWork: {} };
 async function asUser(user: string, sql: string) {
   await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub', '${user}', false);`);
   try { return await db.query(sql); } finally { await db.exec('reset role'); }
@@ -26,6 +26,9 @@ beforeAll(async () => {
   await db.exec('grant all on public.timesheet_logs, public.timesheet_reports, public.timesheet_pop_settings to anon, authenticated');
   await db.exec(migration); // Repeatability is part of the setup contract.
   await db.exec(workspace);
+  const privateConfig = readFileSync(new URL('./migrations/202610230001_private_workspace_configuration.sql', import.meta.url), 'utf8');
+  await db.exec(privateConfig);
+  await db.exec(privateConfig);
 }, 30000);
 afterAll(async () => { await db?.close(); });
 describe('Migration on embedded PostgreSQL (local verification)', () => {
@@ -81,7 +84,7 @@ describe('Migration on embedded PostgreSQL (local verification)', () => {
     expect((await asUser(B, `update public.timesheet_pop_settings set periods = '[]' where user_id = '${A}' returning *`)).rows).toEqual([]);
     expect((await asUser(B, `delete from public.timesheet_pop_settings where user_id = '${A}' returning *`)).rows).toEqual([]);
     await expect(asUser(A, `update public.timesheet_pop_settings set user_id = '${B}'`)).rejects.toThrow('row-level security');
-    const restored = JSON.stringify({ ...report, settings: { openingPto: 123, autoPto: false }, entries: [{ id: 'leave', date: '2026-10-02', category: 'adjustment', hours: -1.25 }], projectedWork: { '2026-11': 120 } });
+    const restored = JSON.stringify({ ...report, settings: { openingPto: 123, autoPto: false, ptoAccrualRate: 0.125 }, entries: [{ id: 'leave', date: '2026-10-02', category: 'adjustment', hours: -1.25 }], projectedWork: { '2026-11': 120 } });
     const logs = '[{"user_id":"'+B+'","date":"2026-10-05","total_hours":4.1,"notes":"restore"}]';
     expect((await asUser(A, `select public.replace_timesheet_workspace('${logs}','${restored}','${periods}') as count`)).rows).toEqual([{ count: 1 }]);
     expect((await asUser(A, 'select date::text, total_hours, user_id from public.timesheet_logs')).rows).toEqual([{ date: '2026-10-05', total_hours: '4.1', user_id: A }]);
