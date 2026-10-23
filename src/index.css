@@ -1051,3 +1051,8 @@ button:disabled { cursor: wait; }
 .leave-breakdown dt { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.3rem; }
 .leave-breakdown dd { margin: 0; font-family: var(--font-mono); font-size: 1.15rem; font-weight: 600; }
 .leave-breakdown dd small { font-family: var(--font-sans); font-size: 0.65rem; color: var(--text-muted); font-weight: 400; }
+
+/* Today stays visible over holiday, weekend, and logged-day colors. */
+.calendar-day.calendar-today { background: #facc15; border-color: #fde68a; color: #302600; box-shadow: 0 0 0 2px #facc1540; }
+.calendar-day.calendar-today .calendar-date, .calendar-day.calendar-today .calendar-hours { color: #302600; font-weight: 700; }
+.calendar-day.calendar-today:hover { background: #fde047; }

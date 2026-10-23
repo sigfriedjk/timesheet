@@ -584,3 +584,16 @@ test('break minutes round up to six-minute increments on blur', async ({ page })
     await expect(input).toHaveValue(rounded);
   }
 });
+
+
+test('calendar highlights the actual current day even when it has logged hours', async ({ page }) => {
+  const state = await backend(page);
+  state.logs.push(entry('2026-10-22', 8));
+  await page.goto('/?view=calendar');
+  const today = page.locator('.calendar-day[aria-current="date"]');
+  await expect(today).toHaveClass(/calendar-today/);
+  await expect(today).toHaveClass(/calendar-logged/);
+  await expect(today).toHaveAttribute('aria-label', /^October 22, 2026:/);
+  await page.getByRole('button', { name: 'Previous year', exact: true }).click();
+  await expect(page.locator('.calendar-today')).toHaveCount(0);
+});

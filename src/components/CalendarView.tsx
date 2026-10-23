@@ -4,6 +4,7 @@ import { Calendar as CalendarIcon, Trash2, Edit3, Plus, X } from 'lucide-react';
 import { MONTH_NAMES, WEEKDAY_NAMES, getFederalHolidays, getMonthCells, getMonthSummary } from '../utils/calendar';
 import { roundToTenth } from '../utils/calculations';
 import { formatNumber } from '../utils/format';
+import { useTodayDate } from '../hooks/useTodayDate';
 
 interface CalendarViewProps {
   logs: TimeLog[];
@@ -16,6 +17,7 @@ interface CalendarViewProps {
 export const CalendarView: React.FC<CalendarViewProps> = ({
   logs, isSample, onNavigateToCalculator, onDeleteLog, onSaveLog,
 }) => {
+  const today = useTodayDate();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const remove = async (date: string) => {
@@ -65,7 +67,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   const label = `${monthName} ${day.day}, ${selectedYear}: ${log ? `${formatNumber(log.totalHours, 1)} hours` : 'no entry'}${day.holiday ? `; ${day.holiday}` : ''}`;
                   return (
                     <button key={day.date} type="button" onClick={() => setSelectedDate(day.date)}
-                      className={`calendar-day${day.isWeekend ? ' calendar-weekend' : ''}${day.holiday ? ' calendar-holiday' : ''}${log ? ' calendar-logged' : ''}`}
+                      className={`calendar-day${day.isWeekend ? ' calendar-weekend' : ''}${day.holiday ? ' calendar-holiday' : ''}${log ? ' calendar-logged' : ''}${day.date === today ? ' calendar-today' : ''}`}
+                      aria-current={day.date === today ? 'date' : undefined}
                       aria-label={label} title={`${label}${log?.notes ? `; ${log.notes}` : ''}`}>
                       <span className="calendar-date">{day.day}{day.holiday && <span className="holiday-marker" aria-hidden="true">•</span>}</span>
                       <span className="calendar-hours">{log ? formatNumber(log.totalHours, 1) : '—'}</span>
